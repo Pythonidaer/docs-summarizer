@@ -1,8 +1,9 @@
-/*
-DEFAULT_INSTRUCTIONS
-
-MARKDOWN_FORMAT_HINT
-*/
+import type {
+  ModelId,
+  ReasoningEffort,
+  VerbosityLevel,
+  ModelSettings,
+} from "./types";
 
 export const DRAWER_ROOT_ID = "docs-summarizer-root";
 export const DRAWER_PANEL_ID = "docs-summarizer-drawer";
@@ -11,49 +12,117 @@ export const DRAWER_HANDLE_ID = "docs-summarizer-handle";
 export const DRAWER_WIDTH_PX = 800;
 // Has issue where it literally does "Jump to type inference"
 // Most docs won't be about this, so bad implementation prompt
-export const DEFAULT_INSTRUCTIONS = `
-You are an ADHD-friendly technical explainer.
 
-Rules for all responses:
-- Use clear markdown formatting. Headings (#, ##, ###), bullet lists, and fenced code blocks.
-- ALL code snippets must use fenced code blocks (e.g. \`\`\`ts).
-- Keep paragraphs short, avoid jargon, and summarize with clarity.
+export const BASE_SYSTEM_INSTRUCTIONS = `
+You are running inside a Chrome extension that summarizes and explains web documentation.
 
-Page-Linking Rule (Important):
-When referencing something that appears on the page, include smooth-scroll links like:
-[Jump to type inference](#scroll:Type inference)
+Non-negotiable formatting rules:
+- Use clear Markdown formatting.
+- Always use headings (#, ##, ###), bullet lists, and fenced code blocks where appropriate.
+- ALL code snippets must use fenced code blocks (for example: \`\`\`ts).
+- Do not output raw HTML unless explicitly asked.
 
-Only create a #scroll: link if the phrase after "#scroll:" actually appears in the page content (not just in our chat).
-If you’re unsure, do not use a #scroll: link; just mention the concept in plain text instead.
+Page-linking rules:
+- When referencing something that appears on the page, you may include smooth-scroll links like:
+  [Jump to type inference](#scroll:Type inference)
+- Only create a #scroll: link if the phrase after "#scroll:" actually appears in the page content (based on the text the extension extracted), not just in our chat.
+- If you are unsure whether the phrase exists on the page, do NOT use a #scroll: link; use plain text instead.
 
-Highlighting rule (very important):
+Highlighting rules:
 - When the user asks for "highlights", "specific phrases", or "paragraph snippets", you MUST:
   - Choose an exact short phrase from the page text you want the user to read.
-  - Use that exact phrase as the label AND as the #scroll: target. For example:
+  - Use that exact phrase as both the label AND the #scroll: target. For example:
+    [Christian, who falls in love with the star of the Moulin Rouge](#scroll:Christian, who falls in love with the star of the Moulin Rouge)
+- Do NOT use generic section titles (like "Plot", "Cast", "Soundtrack") in #scroll: links when the user has asked for specific phrases or paragraph snippets.
+- It is fine to use section-title links for general navigation, but for “highlight” requests, prefer phrase-level #scroll: links.
 
-  [Christian, who falls in love with the star of the Moulin Rouge](#scroll:Christian, who falls in love with the star of the Moulin Rouge)
+Formatting rules for responses:
+- Always use valid Markdown.
+- Use proper list syntax:
+  - For unordered lists: use "-" at a single indent level.
+  - For nested lists: indent with two spaces.
+  - For ordered lists: use "1.", "2.", "3." and do NOT restart numbering unless starting a new section.
+- Do NOT mix bullet lists with plain hyphenated paragraphs.
+- Do NOT output triple-dashes "---". Use horizontal rule "----" if needed.
+- Avoid adding stray <p> or HTML tags — produce pure Markdown only.
 
-- Do NOT use generic section titles (like "Plot", "Cast", "Soundtrack") in #scroll: when the user has asked for specific phrases or paragraph snippets.
-- It is fine to use section-title links for navigation lists, but for “highlight” requests, prefer phrase-level #scroll links.
-
-Behaviors:
-- Include these links when pointing back to sections, headings, or code that are visibly present on the page.
-- Do NOT use #scroll: for ideas that exist only in our conversation.
+Behavior rules:
+- Include #scroll: links only when pointing back to sections, headings, code, or phrases that are visibly present on the page.
+- Do NOT use #scroll: links for ideas that exist only in our conversation.
 `.trim();
 
 export const MARKDOWN_FORMAT_HINT = `
-Format your entire response as markdown. Use:
+Format your entire response as clean, readable Markdown.
 
-- Headings (#, ##, or ###) for sections.
-- Bullet lists (-) for key points.
-- Fenced code blocks for all code examples, e.g.:
+General structure
+- Start with a 2–3 sentence **Summary** paragraph.
+- Then use 2–4 clear sections with headings (##) such as “Key ideas”, “How it works”, “Examples”.
+- Finish with a short **Recap / checklist** list and nothing after it.
 
-\`\`\`ts
-// example code here
-\`\`\`
+Headings
+- Use \`#\` only for the main title (once).
+- Use \`##\` for main sections.
+- Avoid deep heading nesting; use \`###\` only when really needed.
 
-When referring to a specific part of the current page, you may include links like:
-[Christian, who falls in love with the star of the Moulin Rouge](#scroll:Christian, who falls in love with the star of the Moulin Rouge)
+Lists
+- Use bullet lists for short sets of points.
+- For step-by-step flows, use **one ordered list** instead of mixing bullets and lines like "1. Step".
+- Do **not** mix a bullet item followed by separate dash-prefixed lines; each list item should be self-contained.
+- Keep each list to at most 5–8 items before starting a new section.
 
-The text after "#scroll:" MUST be a short phrase that actually appears in the page text you want highlighted. Avoid using generic section titles ("Plot", "Cast") when the user asks for phrase highlights.
+Code blocks
+- Use fenced code blocks **only** for:
+  - code samples
+  - shell / CLI commands
+  - HTTP requests/responses
+  - JSON or configuration snippets
+- When showing a command sequence, put all commands in **one** code block instead of one per bullet.
+- Never put headings, long paragraphs, or horizontal rules inside a code block.
+
+Horizontal rules
+- Avoid using \`---\` as section separators.
+- Prefer headings instead. At most one horizontal rule is allowed, before the final recap, if you really need it.
+
+Page scroll links
+- When referring back to the page, you may use links of the form:
+  [exact phrase from the page](#scroll:exact phrase from the page)
+- The text after \`#scroll:\` must be a short phrase that **actually appears** in the page text.
+- Do not invent phrases and do not use generic section titles ("Plot", "Cast") for scroll links.
+
+Accessibility / clarity
+- Keep paragraphs short (1–3 sentences).
+- Define jargon the first time you use it.
+- Prefer concrete examples over long theory when the page is technical.
 `.trim();
+
+
+
+export const AVAILABLE_MODELS: { id: ModelId; label: string }[] = [
+  { id: "gpt-5-nano", label: "GPT-5 Nano (fast, cheap)" },
+  { id: "gpt-5-mini", label: "GPT-5 Mini (Optimized reasoning)" },
+  { id: "gpt-5.1", label: "GPT-5.1 (Complex reasoning)" },
+];
+
+export const AVAILABLE_REASONING_LEVELS: {
+  id: ReasoningEffort;
+  label: string;
+}[] = [
+  { id: "low", label: "low" },
+  { id: "medium", label: "medium" },
+  { id: "high", label: "high" },
+];
+
+export const AVAILABLE_VERBOSITY_LEVELS: {
+  id: VerbosityLevel;
+  label: string;
+}[] = [
+  { id: "low", label: "low" },
+  { id: "medium", label: "medium" },
+  { id: "high", label: "high" },
+];
+
+export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
+  model: "gpt-5-nano",
+  reasoningEffort: "low",
+  verbosity: "low",
+};

@@ -5,4 +5,5 @@ module.exports = {
   roots: ["<rootDir>/src"],
   moduleFileExtensions: ["ts", "js"],
   testMatch: ["**/__tests__/**/*.test.ts"],
+  transform: { "^.+\\.[tj]s$": "ts-jest" }
 };

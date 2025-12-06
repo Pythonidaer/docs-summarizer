@@ -1,36 +1,55 @@
+// src/extension/openai.ts
 import { ensureApiKey } from "./storage/apiKey";
-import { DEFAULT_INSTRUCTIONS, MARKDOWN_FORMAT_HINT } from "./constants";
-import type { Message } from "./types";
+import { BASE_SYSTEM_INSTRUCTIONS, MARKDOWN_FORMAT_HINT } from "./constants";
+import type { Message, ModelSettings } from "./types";
+import { getPromptVoiceInstructions, PromptVoiceId } from "./prompts/voices";
 
-
-export function getActiveInstructions(
-  useCustom: boolean,
-  instructionsText: string
-): string {
-  const trimmed = instructionsText.trim();
-
-  if (useCustom && trimmed.length > 0) {
-    return trimmed;
-  }
-
-  return DEFAULT_INSTRUCTIONS;
+export interface BuildInstructionsOptions {
+  useCustom: boolean;
+  customInstructions: string;
+  promptVoiceId?: PromptVoiceId; // optional for now
 }
 
-export function buildInputForPageSummary(
-  text: string,
-  useCustom: boolean,
-  instructionsText: string
-): string {
+export function buildInstructions(options: BuildInstructionsOptions): string {
+  const { useCustom, customInstructions, promptVoiceId } = options;
+
+  const pieces: string[] = [];
+
+  // 1) System layer – always included
+  pieces.push(BASE_SYSTEM_INSTRUCTIONS);
+
+  // 2) Prompt voice layer – selected style
+  const voiceInstructions = getPromptVoiceInstructions(promptVoiceId ?? "default");
+  if (voiceInstructions.trim().length > 0) {
+    pieces.push(voiceInstructions.trim());
+  }
+
+  // 3) Custom layer – only if enabled and non-empty
+  if (useCustom) {
+    const trimmed = customInstructions.trim();
+    if (trimmed.length > 0) {
+      pieces.push(trimmed);
+    }
+  }
+
+  return pieces.join("\n\n");
+}
+
+export function buildInputForPageSummary(text: string): string {
   const lines: string[] = [];
 
-  if (useCustom) {
-    // If using custom instructions, let them define style
-    lines.push("Summarize the following documentation according to your active instructions.");
-  } else {
-    // Default ADHD-friendly summary behavior
-    lines.push("Summarize and explain the following documentation for a junior-level engineer.");
-    lines.push("Start with a 2–3 sentence overview, then provide 3–5 bullet points of key ideas.");
-  }
+  lines.push("Summarize and explain the following documentation.");
+  lines.push("Produce **clean, valid Markdown** with consistent structure.");
+
+  lines.push("Formatting rules:");
+  lines.push("- Use proper Markdown lists. Do not mix hyphens with plain indented text.");
+  lines.push("- For unordered lists, always use '-' at one indent level.");
+  lines.push("- For ordered lists, increment numbers normally (1., 2., 3.). Do not restart numbering.");
+  lines.push("- Avoid the '1., 1., 1.' pattern.");
+  lines.push("- Do not output raw HTML tags unless necessary.");
+  lines.push("- Use '----' for a horizontal rule, never '---'.");
+  lines.push("- Keep paragraphs short so they render well in narrow UI containers.");
+  lines.push("- Never wrap list items in stray paragraphs.");
 
   lines.push("");
   lines.push("DOCUMENTATION:");
@@ -42,129 +61,208 @@ export function buildInputForPageSummary(
   return lines.join("\n");
 }
 
-export function buildInputForConversation(pageText: string, history: Message[], instructions: string): string {
-    const lines: string[] = [];
+export function buildInputForConversation(
+  pageText: string,
+  history: Message[]
+): string {
+  const lines: string[] = [];
 
-    lines.push("You are helping a developer understand the following documentation.");
-    lines.push("");
-    lines.push("=== PAGE CONTENT (read-only context) ===");
-    lines.push(pageText);
-    lines.push("");
-    lines.push("=== CONVERSATION SO FAR ===");
+  lines.push("You are helping a developer understand the following documentation.");
+  lines.push("");
+  lines.push("=== PAGE CONTENT (read-only context) ===");
+  lines.push(pageText);
+  lines.push("");
+  lines.push("=== CONVERSATION SO FAR ===");
 
-    if (history.length === 0) {
-        lines.push("(No prior conversation.)");
-    } else {
-        for (const msg of history) {
-            const prefix = msg.role === "user" ? "User" : "Assistant";
-            lines.push(`${prefix}: ${msg.text}`);
-        }
+  if (history.length === 0) {
+    lines.push("(No prior conversation.)");
+  } else {
+    for (const msg of history) {
+      const prefix = msg.role === "user" ? "User" : "Assistant";
+      lines.push(`${prefix}: ${msg.text}`);
     }
+  }
 
-    lines.push("");
-    lines.push("Continue the conversation as the assistant, responding to the most recent user message.");
-    lines.push("");
-    lines.push("=== RESPONSE FORMAT ===");
-    lines.push(MARKDOWN_FORMAT_HINT);
+  lines.push("");
+  lines.push("Continue the conversation as the assistant, responding to the most recent user message.");
+  lines.push("");
+  lines.push("=== RESPONSE FORMAT ===");
+  lines.push(MARKDOWN_FORMAT_HINT);
 
-    return lines.join("\n");
+  return lines.join("\n");
 }
+
+type CallMode = "summary" | "chat";
 
 export async function callOpenAI(
   input: string,
-  instructions: string
+  instructions: string,
+  modelSettings: ModelSettings,
+  mode: CallMode
 ): Promise<string> {
   const apiKey = await ensureApiKey();
   if (!apiKey) {
     throw new Error("API key missing");
   }
 
+  // Debug logging: see exactly what we send
+  console.groupCollapsed(
+    `[Docs Summarizer] OpenAI request (${mode}) – ${new Date().toISOString()}`
+  );
+  console.log("Model settings", modelSettings);
+  console.log("Instructions (final composite prompt)", instructions);
+  console.log("Input (first 8000 chars)", input.slice(0, 8000));
+  console.groupEnd();
+
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`, // API key is NOT logged anywhere
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-5-nano",
+      model: modelSettings.model,
       instructions,
       input,
-      max_output_tokens: 2000,
-      reasoning: { effort: "low" },
+      max_output_tokens: 8000,
+      reasoning: { effort: modelSettings.reasoningEffort },
       text: {
-        verbosity: "low",
+        verbosity: modelSettings.verbosity,
       },
     }),
   });
 
-  if (!response.ok) {
-    throw new Error(`OpenAI error: ${response.status}`);
+  const status = response.status;
+  let data: any;
+
+  try {
+    data = await response.json();
+  } catch (e) {
+    console.error("[Docs Summarizer] Failed to parse OpenAI JSON", e);
+    throw new Error(`OpenAI error (invalid JSON, status ${status})`);
   }
 
-  const data = (await response.json()) as any;
+  console.groupCollapsed(
+    `[Docs Summarizer] OpenAI response (${mode}) – status ${status}`
+  );
+  console.log("Raw response JSON", data);
+  console.log("response.status field", data?.status);
+  console.log("response.incomplete_details", data?.incomplete_details);
+  console.log("response.error", data?.error);
+  console.groupEnd();
+
+  // HTTP-level error
+  if (!response.ok) {
+    const msg =
+      data?.error?.message ??
+      data?.error ??
+      `HTTP ${status}`;
+    throw new Error(`OpenAI error: ${msg}`);
+  }
+
+  // API-level error inside JSON
+  if (data?.error) {
+    const msg =
+      data.error.message ??
+      data.error.type ??
+      JSON.stringify(data.error);
+    throw new Error(`OpenAI error: ${msg}`);
+  }
+
+  // Responses API status field (completed / incomplete / failed / cancelled)
+  if (data?.status && data.status !== "completed") {
+    const details = data?.incomplete_details
+      ? ` – details: ${JSON.stringify(data.incomplete_details)}`
+      : "";
+    throw new Error(
+      `OpenAI response not completed (status: ${data.status})${details}`
+    );
+  }
+
   const summaryText = extractTextFromResponse(data);
 
   if (!summaryText || !summaryText.trim()) {
+    // Last fallback: show that we saw a "successful" but empty payload
     throw new Error(
-      "The model returned an empty response. Try rephrasing your question or reducing the amount of text."
+      "The model returned an empty response (no text blocks found). " +
+        "Try reducing the amount of page text or adjusting instructions."
     );
   }
 
   return summaryText;
 }
 
+// ------------ High-level helpers --------------
 
-// ------------ OpenAI call via fetch --------------
 export async function summarizeWithOpenAI(
   pageText: string,
   useCustom: boolean,
-  customInstructions: string
+  customInstructions: string,
+  promptVoiceId: PromptVoiceId,
+  modelSettings: ModelSettings
 ): Promise<string> {
-  const instructions = getActiveInstructions(useCustom, customInstructions);
-const input = buildInputForPageSummary(
-  pageText,
-  useCustom,
-  customInstructions
-);  return callOpenAI(input, instructions);
+  const input = buildInputForPageSummary(pageText);
+
+  const instructions = buildInstructions({
+    useCustom,
+    customInstructions,
+    promptVoiceId,
+  });
+
+  console.log("[Docs Summarizer] Using prompt voice (summary)", { promptVoiceId });
+
+  return callOpenAI(input, instructions, modelSettings, "summary");
 }
 
 export async function chatWithOpenAI(
   pageText: string,
   history: Message[],
   useCustom: boolean,
-  customInstructions: string
+  customInstructions: string,
+  promptVoiceId: PromptVoiceId,
+  modelSettings: ModelSettings
 ): Promise<string> {
-  const instructions = getActiveInstructions(useCustom, customInstructions);
-  const input = buildInputForConversation(pageText, history, instructions);
-  return callOpenAI(input, instructions);
+  const input = buildInputForConversation(pageText, history);
+
+  const instructions = buildInstructions({
+    useCustom,
+    customInstructions,
+    promptVoiceId,
+  });
+
+  console.log("[Docs Summarizer] Using prompt voice (chat)", { promptVoiceId });
+
+  return callOpenAI(input, instructions, modelSettings, "chat");
 }
 
-export function extractTextFromResponse(data: any) : string {
-    // 1) Try convenience field if present
-    if (typeof data.output_text === "string" && data.output_text.trim()) {
-        return data.output_text.trim();
+// ------------ Response extractor --------------
+
+export function extractTextFromResponse(data: any): string {
+  // 1) Try convenience field if present
+  if (typeof data.output_text === "string" && data.output_text.trim()) {
+    return data.output_text.trim();
+  }
+
+  const outputs = data.output;
+  if (!Array.isArray(outputs)) return "";
+
+  // 2) Look through all output items for an output_text content block
+  for (const item of outputs) {
+    if (!item || !Array.isArray(item.content)) continue;
+
+    for (const piece of item.content) {
+      if (!piece) continue;
+
+      // Most common shape: { type: "output_text", text: "..." }
+      if (
+        (piece.type === "output_text" || piece.type === "output") &&
+        typeof piece.text === "string" &&
+        piece.text.trim()
+      ) {
+        return piece.text.trim();
+      }
     }
+  }
 
-    const outputs = data.output;
-    if (!Array.isArray(outputs)) return "";
-
-    // 2) Look through all output items for an output_text content block
-    for (const item of outputs) {
-        if (!item || !Array.isArray(item.content)) continue;
-
-        for (const piece of item.content) {
-            if (!piece) continue;
-
-            // Most common shape: { type: "output_text", text: "..." }
-            if (
-                (piece.type === "output_text" || piece.type === "output") &&
-                typeof piece.text === "string" &&
-                piece.text.trim()
-            ) {
-                return piece.text.trim();
-         }
-        }
-    }
-
-    return "";
+  return "";
 }
