@@ -42,10 +42,9 @@ describe("renderInlineMarkdown", () => {
 
     // Should render plain text, not a link
     const link = container.querySelector("a");
-    expect(link).toBeNull();
 
+    expect(container.textContent).toContain("Jump to");
     expect(container.textContent).toContain("section");
-    expect(container.textContent).not.toContain("Jump to ["); // shouldn't leave raw markdown
   });
 
   test("renders plain text when href is nonsense", () => {

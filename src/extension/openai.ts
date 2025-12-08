@@ -35,7 +35,7 @@ export function buildInstructions(options: BuildInstructionsOptions): string {
   return pieces.join("\n\n");
 }
 
-export function buildInputForPageSummary(text: string): string {
+export function buildInputForPageSummary(text: string, structureSummary?: string): string {
   const lines: string[] = [];
 
   lines.push("Summarize and explain the following documentation.");
@@ -55,6 +55,11 @@ export function buildInputForPageSummary(text: string): string {
   lines.push("DOCUMENTATION:");
   lines.push(text);
   lines.push("");
+
+  if (structureSummary && structureSummary.trim().length > 0) {
+    lines.push("");
+    lines.push(structureSummary.trim())
+  }
   lines.push("=== RESPONSE FORMAT ===");
   lines.push(MARKDOWN_FORMAT_HINT);
 
@@ -196,12 +201,13 @@ export async function callOpenAI(
 
 export async function summarizeWithOpenAI(
   pageText: string,
+  pageStructureSummary: string | null,
   useCustom: boolean,
   customInstructions: string,
   promptVoiceId: PromptVoiceId,
   modelSettings: ModelSettings
 ): Promise<string> {
-  const input = buildInputForPageSummary(pageText);
+  const input = buildInputForPageSummary(pageText, pageStructureSummary ?? "");
 
   const instructions = buildInstructions({
     useCustom,

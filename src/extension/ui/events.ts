@@ -14,6 +14,7 @@ export interface WireDrawerEventsArgs {
   summarizeBtn: HTMLButtonElement;
   main: HTMLDivElement;
   pageText: string;
+  pageStructureSummary: string;
   messages: Message[];
   setDrawerOpen: (
     root: HTMLDivElement,
@@ -38,6 +39,7 @@ export function wireDrawerEvents({
   main,
   pageText,
   messages,
+  pageStructureSummary,
   setDrawerOpen,
   getUseCustomInstructions,
   getCustomInstructions,
@@ -126,6 +128,7 @@ export function wireDrawerEvents({
 
       const summary = await summarizeWithOpenAI(
         pageText,
+        pageStructureSummary,
         getUseCustomInstructions(),
         getCustomInstructions(),
         getPromptVoiceId(),

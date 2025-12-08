@@ -8,8 +8,6 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  const pageTextLower = (getPageTextForLinks() || "").toLowerCase();
-
   while ((match = linkRegex.exec(text)) !== null) {
     const full = match[0];
     const rawLabel = match[1] ?? "";
@@ -48,8 +46,8 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
         scrollTerm = scrollTerm.trim();
       }
 
-      // If term is empty or not in page text, fall back to plain text
-      if (!scrollTerm || !pageTextLower.includes(scrollTerm.toLowerCase())) {
+      if (!scrollTerm) {
+        // Empty term → just render plain text
         container.appendChild(document.createTextNode(label));
       } else {
         const a = document.createElement("a");
@@ -118,6 +116,7 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
     }
   }
 }
+
 
 // --- Block-level markdown: headings, lists, code, hr, paragraphs -------------
 

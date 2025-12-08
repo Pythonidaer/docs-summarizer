@@ -116,115 +116,153 @@ export function clearAllHighlights(): void {
  *  - If that fails (phrase crosses links/nodes), highlight the whole element instead
  */
 export function scrollToPageMatch(term: string): void {
-    console.log("[Docs Summarizer] scrollToPageMatch called", { term });
+  console.log("[Docs Summarizer] scrollToPageMatch called", { term });
 
-    // Clear previous highlights so we don't stack spans
-    clearAllHighlights();
+  const rawTerm = term.trim();
+  if (!rawTerm) {
+    console.warn("[Docs Summarizer] Empty scroll term received");
+    return;
+  }
 
-    const originalTarget = findPageMatchElement(term);
-    if (!originalTarget) {
-        console.warn("[Docs Summarizer] No page match found for scroll target:", term);
-        alert(
-            'Docs Summarizer could not find that phrase on this page. ' +
-            'The model may have referenced text that is not actually present ' +
-            'or used slightly different punctuation/wording.'
-        );
-        return;
-    }
+  const lowerTerm = rawTerm.toLowerCase();
 
-    const lowerTerm = term.trim().toLowerCase();
+  // Global guard: check against the full rendered page text first.
+  // This protects us if the model invents a phrase that never appears.
+  const fullPageText =
+    (document.body.innerText || document.body.textContent || "").toLowerCase();
 
-    // If findPageMatchElement somehow gave us a very large container,
-    // refine to the smallest child block that actually contains the phrase.
-    const BASE_SELECTOR = "h1,h2,h3,h4,h5,h6,p,li,code,pre";
-    const getText = (el: HTMLElement): string =>
-        (el.innerText || el.textContent || "").toLowerCase();
-
-    let target: HTMLElement = originalTarget;
-    const originalTextLen = getText(originalTarget).length;
-
-    if (
-        (!originalTarget.matches(BASE_SELECTOR) || originalTextLen > 3000) &&
-        lowerTerm
-    ) {
-        const candidates = Array.from(
-            originalTarget.querySelectorAll<HTMLElement>(BASE_SELECTOR)
-        ).filter((el) => getText(el).includes(lowerTerm));
-
-        if (candidates.length > 0) {
-            target = candidates.reduce((best, el) => {
-                const bestLen = getText(best).length;
-                const thisLen = getText(el).length;
-                return thisLen < bestLen ? el : best;
-            });
-            console.log("[Docs Summarizer] Refined fallback target to child element", {
-                term,
-                originalTarget,
-                refinedTarget: target
-            });
-        }
-    }
-
-    console.log("[Docs Summarizer] Using target element for term", { term, target });
-
-    // Scroll the target into view
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
-
-    // If term is empty, just highlight the block and return
-    if (!lowerTerm) {
-        target.classList.add("docs-summarizer-page-highlight");
-        blockHighlights.push(target);
-        console.log("[Docs Summarizer] Applied block highlight (empty term)", { term });
-        return;
-    }
-
-    let foundInline = false;
-
-    const walker = document.createTreeWalker(
-        target,
-        NodeFilter.SHOW_TEXT,
-        null
+  if (!fullPageText.includes(lowerTerm)) {
+    console.warn(
+      "[Docs Summarizer] Scroll term not found in full page text:",
+      rawTerm
     );
+    alert(
+      "Docs Summarizer could not find that phrase on this page.\n\n" +
+        "The model may have referenced text that is not actually present " +
+        "or used a phrase that only appears in its own summary."
+    );
+    return;
+  }
 
-    while (walker.nextNode()) {
-        const textNode = walker.currentNode as Text;
-        const text = textNode.textContent ?? "";
-        const textLower = text.toLowerCase();
-        const index = textLower.indexOf(lowerTerm);
-        if (index === -1) continue;
+  // Clear previous highlights so we don't stack spans
+  clearAllHighlights();
 
-        const range = document.createRange();
-        range.setStart(textNode, index);
-        range.setEnd(textNode, index + lowerTerm.length);
+  const originalTarget = findPageMatchElement(rawTerm);
+  if (!originalTarget) {
+    console.warn(
+      "[Docs Summarizer] No page match found for scroll target:",
+      rawTerm
+    );
+    alert(
+      "Docs Summarizer could not find that phrase on this page. " +
+        "The model may have referenced text that is not actually present " +
+        "or used slightly different punctuation/wording."
+    );
+    return;
+  }
 
-        const span = document.createElement("span");
-        span.style.backgroundColor = "rgba(249, 115, 22, 0.12)";
-        span.style.outline = "2px solid #f97316";
-        span.style.borderRadius = "2px";
-        span.style.padding = "0 1px";
+  // If findPageMatchElement somehow gave us a very large container,
+  // refine to the smallest child block that actually contains the phrase.
+  const BASE_SELECTOR = "h1,h2,h3,h4,h5,h6,p,li,code,pre";
+  const getText = (el: HTMLElement): string =>
+    (el.innerText || el.textContent || "").toLowerCase();
 
-        try {
-            range.surroundContents(span);
-            inlineHighlights.push(span);
-            foundInline = true;
-            console.log("[Docs Summarizer] Applied inline highlight", { term });
-        } catch (e) {
-            console.warn("[Docs Summarizer] Could not highlight phrase inline:", e);
+  let target: HTMLElement = originalTarget;
+  const originalTextLen = getText(originalTarget).length;
+
+  if (
+    (!originalTarget.matches(BASE_SELECTOR) || originalTextLen > 3000) &&
+    lowerTerm
+  ) {
+    const candidates = Array.from(
+      originalTarget.querySelectorAll<HTMLElement>(BASE_SELECTOR)
+    ).filter((el) => getText(el).includes(lowerTerm));
+
+    if (candidates.length > 0) {
+      target = candidates.reduce((best, el) => {
+        const bestLen = getText(best).length;
+        const thisLen = getText(el).length;
+        return thisLen < bestLen ? el : best;
+      });
+      console.log(
+        "[Docs Summarizer] Refined fallback target to child element",
+        {
+          term: rawTerm,
+          originalTarget,
+          refinedTarget: target,
         }
+      );
+    }
+  }
 
-        break; // only the first inline hit
+  console.log("[Docs Summarizer] Using target element for term", {
+    term: rawTerm,
+    target,
+  });
+
+  // Scroll the target into view
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+
+  let foundInline = false;
+
+  const walker = document.createTreeWalker(
+    target,
+    NodeFilter.SHOW_TEXT,
+    null
+  );
+
+  while (walker.nextNode()) {
+    const textNode = walker.currentNode as Text;
+    const text = textNode.textContent ?? "";
+    const textLower = text.toLowerCase();
+    const index = textLower.indexOf(lowerTerm);
+    if (index === -1) continue;
+
+    const range = document.createRange();
+    range.setStart(textNode, index);
+    range.setEnd(textNode, index + lowerTerm.length);
+
+    const span = document.createElement("span");
+    span.style.backgroundColor = "rgba(249, 115, 22, 0.12)";
+    span.style.outline = "2px solid #f97316";
+    span.style.borderRadius = "2px";
+    span.style.padding = "0 1px";
+
+    try {
+      range.surroundContents(span);
+      inlineHighlights.push(span);
+      foundInline = true;
+      console.log("[Docs Summarizer] Applied inline highlight", {
+        term: rawTerm,
+      });
+    } catch (e) {
+      console.warn(
+        "[Docs Summarizer] Could not highlight phrase inline:",
+        e
+      );
     }
 
-    // Always highlight the whole block so the user clearly sees "look here"
-    target.classList.add("docs-summarizer-page-highlight");
-    blockHighlights.push(target);
+    // only the first inline hit
+    break;
+  }
 
-    if (!foundInline) {
-        console.log("[Docs Summarizer] Applied block highlight only (fallback)", { term });
-    } else {
-        console.log("[Docs Summarizer] Applied inline + block highlight", { term });
-    }
+  // Always highlight the whole block so the user clearly sees "look here"
+  target.classList.add("docs-summarizer-page-highlight");
+  blockHighlights.push(target);
+
+  if (!foundInline) {
+    console.log(
+      "[Docs Summarizer] Applied block highlight only (fallback)",
+      { term: rawTerm }
+    );
+  } else {
+    console.log(
+      "[Docs Summarizer] Applied inline + block highlight",
+      { term: rawTerm }
+    );
+  }
 }
+
 
 // === END HIGHLIGHT STATE & HELPERS =================================
 

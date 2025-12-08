@@ -6,11 +6,15 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
 
     if (msgs.length === 0) {
         const placeholder = document.createElement("div");
-        placeholder.textContent = "Click \"Summarize page\" or send a question to get started.";
         Object.assign(placeholder.style, {
             opacity: "0.7",
             fontSize: "13px"
         } as CSSStyleDeclaration);
+
+        const p = document.createElement("p");
+        p.textContent = `Click "Summarize page" or send a question to get started.`;
+        placeholder.appendChild(p);
+
         main.appendChild(placeholder);
         return;
     }

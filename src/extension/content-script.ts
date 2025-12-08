@@ -30,6 +30,10 @@ import {
   setPageBlur,
   setBlurEnabled,
 } from "./ui/focusBlur";
+import {
+    extractPageStructure,
+    serializePageStructureForModel,
+} from "./pageStructure";
 
 // Global UI / prompt state
 let messages: Message[] = [];
@@ -81,9 +85,7 @@ export function setDrawerOpen(
   }
 }
 
-/**
- * Main entry: builds the drawer UI and wires events.
- */
+/* Main entry: builds the drawer UI and wires events.*/
 function createDrawerUI(): void {
   // Avoid creating multiple drawers if script runs twice
   if (document.getElementById(DRAWER_ROOT_ID)) return;
@@ -93,6 +95,11 @@ function createDrawerUI(): void {
 
   const pageText = extractPageTextFromDoc(document);
   setPageTextForLinks(pageText);
+
+  const structure = extractPageStructure(document);
+  const pageStructureSummary = serializePageStructureForModel(
+    structure
+  );
 
   // Inject global highlight styles once
   if (!document.getElementById("docs-summarizer-global-styles")) {
@@ -215,6 +222,7 @@ function createDrawerUI(): void {
     summarizeBtn,
     main,
     pageText,
+    pageStructureSummary,
     messages,
     setDrawerOpen,
     getUseCustomInstructions: () => useCustomInstructions,

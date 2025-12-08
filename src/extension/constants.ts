@@ -24,15 +24,17 @@ Non-negotiable formatting rules:
 
 Page-linking rules:
 - When referencing something that appears on the page, you may include smooth-scroll links like:
-  [Jump to type inference](#scroll:Type inference)
-- Only create a #scroll: link if the phrase after "#scroll:" actually appears in the page content (based on the text the extension extracted), not just in our chat.
-- If you are unsure whether the phrase exists on the page, do NOT use a #scroll: link; use plain text instead.
+  [exact phrase from the page](#scroll:exact phrase from the page)
+- The text after "#scroll:" MUST be a short phrase that ACTUALLY appears verbatim in the page's rendered text (not just in your own summary).
+- Do NOT invent or paraphrase phrases for scroll links. If you are not sure the phrase is present, DO NOT create a scroll link; just use plain text instead.
 
 Highlighting rules:
 - When the user asks for "highlights", "specific phrases", or "paragraph snippets", you MUST:
   - Choose an exact short phrase from the page text you want the user to read.
   - Use that exact phrase as both the label AND the #scroll: target. For example:
     [Christian, who falls in love with the star of the Moulin Rouge](#scroll:Christian, who falls in love with the star of the Moulin Rouge)
+- When choosing phrases for #scroll: links, PREFER text taken from PARAGRAPH or CODE blocks in the main content (for example, prose paragraphs or code examples).
+- Avoid choosing phrases from navigation, header, footer, or reference sections unless the user explicitly asks about those parts.
 - Do NOT use generic section titles (like "Plot", "Cast", "Soundtrack") in #scroll: links when the user has asked for specific phrases or paragraph snippets.
 - It is fine to use section-title links for general navigation, but for “highlight” requests, prefer phrase-level #scroll: links.
 
@@ -48,8 +50,9 @@ Formatting rules for responses:
 
 Behavior rules:
 - Include #scroll: links only when pointing back to sections, headings, code, or phrases that are visibly present on the page.
-- Do NOT use #scroll: links for ideas that exist only in our conversation.
+- Do NOT use #scroll: links for ideas that exist only in our conversation, or only in your own summary.
 `.trim();
+
 
 export const MARKDOWN_FORMAT_HINT = `
 Format your entire response as clean, readable Markdown.
@@ -87,6 +90,8 @@ Page scroll links
 - When referring back to the page, you may use links of the form:
   [exact phrase from the page](#scroll:exact phrase from the page)
 - The text after \`#scroll:\` must be a short phrase that **actually appears** in the page text.
+- Prefer phrases that come from PARAGRAPH or CODE blocks in the main content area (for example, a key sentence in a paragraph or a meaningful fragment of a code example).
+- Avoid using phrases from navigation menus, headers, footers, or reference/bibliography sections unless the user is specifically asking about those parts.
 - Do not invent phrases and do not use generic section titles ("Plot", "Cast") for scroll links.
 
 Accessibility / clarity
