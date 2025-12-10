@@ -39,17 +39,7 @@ export function buildInputForPageSummary(text: string, structureSummary?: string
   const lines: string[] = [];
 
   lines.push("Summarize and explain the following documentation.");
-  lines.push("Produce **clean, valid Markdown** with consistent structure.");
-
-  lines.push("Formatting rules:");
-  lines.push("- Use proper Markdown lists. Do not mix hyphens with plain indented text.");
-  lines.push("- For unordered lists, always use '-' at one indent level.");
-  lines.push("- For ordered lists, increment numbers normally (1., 2., 3.). Do not restart numbering.");
-  lines.push("- Avoid the '1., 1., 1.' pattern.");
-  lines.push("- Do not output raw HTML tags unless necessary.");
-  lines.push("- Use '----' for a horizontal rule, never '---'.");
-  lines.push("- Keep paragraphs short so they render well in narrow UI containers.");
-  lines.push("- Never wrap list items in stray paragraphs.");
+  lines.push("Produce clean, valid Markdown with consistent structure.");
 
   lines.push("");
   lines.push("DOCUMENTATION:");

@@ -24,19 +24,22 @@ Non-negotiable formatting rules:
 
 Page-linking rules:
 - When referencing something that appears on the page, you may include smooth-scroll links like:
-  [exact phrase from the page](#scroll:exact phrase from the page)
-- The text after "#scroll:" MUST be a short phrase that ACTUALLY appears verbatim in the page's rendered text (not just in your own summary).
-- Do NOT invent or paraphrase phrases for scroll links. If you are not sure the phrase is present, DO NOT create a scroll link; just use plain text instead.
+  [link text](#scroll:target phrase)
+- CRITICAL: The text after "#scroll:" MUST be a short phrase (3-15 words) that appears word-for-word, character-for-character, exactly as written in the page's rendered text.
+- MANDATORY VERIFICATION: Before creating ANY #scroll: link, you MUST verify the exact phrase exists in the page text by searching for it. If the phrase is not found, DO NOT create a scroll link—use plain text instead.
+- To verify a phrase exists: it must match text you can see in paragraphs, headings, or code blocks on the page. The phrase must be identical—no changes to capitalization, punctuation, or wording.
+- Do NOT invent, paraphrase, modify, or slightly alter phrases for scroll links. If you cannot find the exact wording on the page, use plain text instead of a scroll link.
+- IMPORTANT: Links that reference non-existent phrases will be automatically converted to plain text, which creates a poor user experience. Always verify first.
+- Prefer phrases from PARAGRAPH or CODE blocks in the main content area.
+- Avoid phrases from navigation menus, headers, footers, or reference sections unless the user explicitly asks about those parts.
 
 Highlighting rules:
 - When the user asks for "highlights", "specific phrases", or "paragraph snippets", you MUST:
-  - Choose an exact short phrase from the page text you want the user to read.
-  - Use that exact phrase as both the label AND the #scroll: target. For example:
-    [Christian, who falls in love with the star of the Moulin Rouge](#scroll:Christian, who falls in love with the star of the Moulin Rouge)
-- When choosing phrases for #scroll: links, PREFER text taken from PARAGRAPH or CODE blocks in the main content (for example, prose paragraphs or code examples).
+  - Choose a short phrase (3-15 words) from the page text you want the user to read.
+  - Use that exact phrase (word-for-word, character-for-character) as both the label AND the #scroll: target.
+- When choosing phrases for #scroll: links, PREFER text taken from PARAGRAPH or CODE blocks in the main content.
 - Avoid choosing phrases from navigation, header, footer, or reference sections unless the user explicitly asks about those parts.
 - Do NOT use generic section titles (like "Plot", "Cast", "Soundtrack") in #scroll: links when the user has asked for specific phrases or paragraph snippets.
-- It is fine to use section-title links for general navigation, but for “highlight” requests, prefer phrase-level #scroll: links.
 
 Formatting rules for responses:
 - Always use valid Markdown.
@@ -44,9 +47,21 @@ Formatting rules for responses:
   - For unordered lists: use "-" at a single indent level.
   - For nested lists: indent with two spaces.
   - For ordered lists: use "1.", "2.", "3." and do NOT restart numbering unless starting a new section.
-- Do NOT mix bullet lists with plain hyphenated paragraphs.
-- Do NOT output triple-dashes "---". Use horizontal rule "----" if needed.
+  - Do NOT mix bullet lists with plain hyphenated paragraphs.
+  - Do NOT use the pattern "1., 1., 1." (restarting numbering).
+- Code blocks:
+  - Use fenced code blocks (\`\`\`language) only for: code samples, shell/CLI commands, HTTP requests/responses, JSON or configuration snippets.
+  - When showing a command sequence, put all commands in one code block instead of one per bullet.
+  - Never put headings, long paragraphs, or horizontal rules inside a code block.
+- Horizontal rules:
+  - Use \`----\` (four dashes) for horizontal rules, never \`---\` (three dashes).
+- Do NOT output raw HTML tags unless explicitly asked.
+- Never wrap list items in stray paragraphs.
 - Avoid adding stray <p> or HTML tags — produce pure Markdown only.
+
+Accessibility / clarity:
+- Keep paragraphs short (1–3 sentences) unless the voice style explicitly requires longer paragraphs.
+- Define jargon the first time you use it.
 
 Behavior rules:
 - Include #scroll: links only when pointing back to sections, headings, code, or phrases that are visibly present on the page.
@@ -57,47 +72,33 @@ Behavior rules:
 export const MARKDOWN_FORMAT_HINT = `
 Format your entire response as clean, readable Markdown.
 
-General structure
-- Start with a 2–3 sentence **Summary** paragraph.
-- Then use 2–4 clear sections with headings (##) such as “Key ideas”, “How it works”, “Examples”.
-- Finish with a short **Recap / checklist** list and nothing after it.
-
-Headings
+Headings:
 - Use \`#\` only for the main title (once).
-- Use \`##\` for main sections.
-- Avoid deep heading nesting; use \`###\` only when really needed.
+- Use \`##\` for main sections, \`###\` for subsections as needed.
+- You may nest headings deeper (\`####\`, \`#####\`) if the content structure requires it.
 
-Lists
+Lists:
 - Use bullet lists for short sets of points.
-- For step-by-step flows, use **one ordered list** instead of mixing bullets and lines like "1. Step".
-- Do **not** mix a bullet item followed by separate dash-prefixed lines; each list item should be self-contained.
+- For step-by-step flows, use one ordered list instead of mixing bullets and lines.
+- Do not mix a bullet item followed by separate dash-prefixed lines; each list item should be self-contained.
 - Keep each list to at most 5–8 items before starting a new section.
 
-Code blocks
-- Use fenced code blocks **only** for:
-  - code samples
-  - shell / CLI commands
-  - HTTP requests/responses
-  - JSON or configuration snippets
-- When showing a command sequence, put all commands in **one** code block instead of one per bullet.
-- Never put headings, long paragraphs, or horizontal rules inside a code block.
+Code blocks:
+- Use fenced code blocks when showing code samples, commands, or structured data.
+- When showing a command sequence, put all commands in one code block instead of one per bullet.
 
-Horizontal rules
-- Avoid using \`---\` as section separators.
-- Prefer headings instead. At most one horizontal rule is allowed, before the final recap, if you really need it.
+Horizontal rules:
+- You may use \`----\` as section separators when it helps organize the response.
+- Prefer headings for major breaks, but horizontal rules are acceptable for visual separation.
 
-Page scroll links
-- When referring back to the page, you may use links of the form:
-  [exact phrase from the page](#scroll:exact phrase from the page)
-- The text after \`#scroll:\` must be a short phrase that **actually appears** in the page text.
-- Prefer phrases that come from PARAGRAPH or CODE blocks in the main content area (for example, a key sentence in a paragraph or a meaningful fragment of a code example).
-- Avoid using phrases from navigation menus, headers, footers, or reference/bibliography sections unless the user is specifically asking about those parts.
-- Do not invent phrases and do not use generic section titles ("Plot", "Cast") for scroll links.
-
-Accessibility / clarity
-- Keep paragraphs short (1–3 sentences).
-- Define jargon the first time you use it.
-- Prefer concrete examples over long theory when the page is technical.
+Page scroll links:
+- When referring back to the page, use links like: [link text](#scroll:target phrase)
+- The phrase after \`#scroll:\` must be a short phrase (3-15 words) that appears word-for-word, character-for-character, exactly as written in the page's rendered text.
+- MANDATORY: Before creating any #scroll: link, you MUST verify the exact phrase exists in the page text. Search the page text for the exact phrase (case-insensitive). If not found, DO NOT create a scroll link—use plain text instead.
+- To verify: the phrase must match text visible in paragraphs, headings, or code blocks on the page. It must be identical—no changes to capitalization, punctuation, or wording.
+- Prefer phrases from PARAGRAPH or CODE blocks in the main content area.
+- If you cannot find the exact wording, use plain text instead of a scroll link.
+- REMINDER: Links to non-existent phrases will be automatically converted to plain text, creating a confusing user experience. Always verify the phrase exists before creating the link.
 `.trim();
 
 
@@ -112,22 +113,21 @@ export const AVAILABLE_REASONING_LEVELS: {
   id: ReasoningEffort;
   label: string;
 }[] = [
-  { id: "low", label: "low" },
-  { id: "medium", label: "medium" },
-  { id: "high", label: "high" },
+  { id: "low", label: "Low" },
+  { id: "medium", label: "Medium" },
 ];
 
 export const AVAILABLE_VERBOSITY_LEVELS: {
   id: VerbosityLevel;
   label: string;
 }[] = [
-  { id: "low", label: "low" },
-  { id: "medium", label: "medium" },
-  { id: "high", label: "high" },
+  { id: "low", label: "Low" },
+  { id: "medium", label: "Medium" },
+  { id: "high", label: "High" },
 ];
 
 export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
-  model: "gpt-5-nano",
-  reasoningEffort: "low",
-  verbosity: "low",
+  model: "gpt-5-nano", // Hard-coded: always use gpt-5-nano
+  reasoningEffort: "low", // Default to low, user can change to medium via UI
+  verbosity: "low", // Hard-coded: always use low
 };

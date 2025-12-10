@@ -50,13 +50,47 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
         // Empty term → just render plain text
         container.appendChild(document.createTextNode(label));
       } else {
-        const a = document.createElement("a");
-        a.textContent = label;
-        a.style.cursor = "pointer";
-        a.style.color = "#f97316"; // internal scroll links
-        a.style.textDecoration = "underline";
+        // Validate that the phrase exists in the page text before rendering as a link
+        const pageTextForValidation = getPageTextForLinks();
+        if (!pageTextForValidation) {
+          // No page text available - render as plain text
+          console.warn(
+            "[Docs Summarizer] Scroll link phrase validation skipped (no page text):",
+            scrollTerm
+          );
+          container.appendChild(document.createTextNode(label));
+        } else {
+          // Normalize whitespace for comparison (collapse multiple spaces/newlines to single space)
+          const normalizedPageText = pageTextForValidation
+            .replace(/\s+/g, " ")
+            .toLowerCase()
+            .trim();
+          const normalizedTerm = scrollTerm.replace(/\s+/g, " ").toLowerCase().trim();
 
-        const termForClick = scrollTerm;
+          // Check if the exact phrase exists in the page text
+          // Also try matching with even more lenient whitespace (for code blocks)
+          const ultraNormalizedPageText = normalizedPageText.replace(/\s/g, "");
+          const ultraNormalizedTerm = normalizedTerm.replace(/\s/g, "");
+
+          const exactMatch = normalizedPageText.includes(normalizedTerm);
+          const lenientMatch = ultraNormalizedPageText.includes(ultraNormalizedTerm);
+
+          if (!exactMatch && !lenientMatch) {
+            // Phrase doesn't exist - render as plain text instead of a link
+            console.warn(
+              "[Docs Summarizer] Scroll link phrase not found in page text, rendering as plain text:",
+              scrollTerm
+            );
+            container.appendChild(document.createTextNode(label));
+          } else {
+            // Phrase exists - render as clickable link
+            const a = document.createElement("a");
+            a.textContent = label;
+            a.style.cursor = "pointer";
+            a.style.color = "#f97316"; // internal scroll links
+            a.style.textDecoration = "underline";
+
+            const termForClick = scrollTerm;
         a.addEventListener("click", (event) => {
           event.preventDefault();
           console.log("[Docs Summarizer] Scroll link clicked", {
@@ -64,16 +98,46 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
             href,
             term: termForClick,
           });
-          scrollToPageMatch(termForClick);
+          
+          // Check if we're in a detached window (no document.body or different origin)
+          const isDetachedWindow = 
+            typeof chrome !== "undefined" && 
+            chrome.runtime &&
+            (window.location.protocol === "chrome-extension:" || 
+             !document.body || 
+             window.location.href.includes("detached-window.html"));
+          
+          if (isDetachedWindow) {
+            // Send message to background script to forward to content script
+            chrome.runtime.sendMessage(
+              {
+                type: "SCROLL_TO_PHRASE",
+                phrase: termForClick,
+              },
+              (response) => {
+                if (chrome.runtime.lastError) {
+                  console.error(
+                    "[Docs Summarizer] Error sending scroll request:",
+                    chrome.runtime.lastError
+                  );
+                }
+              }
+            );
+          } else {
+            // Normal content script - scroll directly
+            scrollToPageMatch(termForClick);
+          }
         });
 
-        console.log("[Docs Summarizer] Render scroll link", {
-          label,
-          href,
-          term: scrollTerm,
-        });
+            console.log("[Docs Summarizer] Render scroll link", {
+              label,
+              href,
+              term: scrollTerm,
+            });
 
-        container.appendChild(a);
+            container.appendChild(a);
+          }
+        }
       }
     } else {
       // External / normal URL?

@@ -42,9 +42,127 @@ describe("renderInlineMarkdown", () => {
 
     // Should render plain text, not a link
     const link = container.querySelector("a");
-
+    expect(link).toBeNull();
     expect(container.textContent).toContain("Jump to");
     expect(container.textContent).toContain("section");
+  });
+
+  test("validates scroll links case-insensitively", () => {
+    setPageTextForLinks("Hello WORLD with Mixed Case");
+
+    const input = "Jump to [section](#scroll:world)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toBe("section");
+  });
+
+  test("validates scroll links with exact phrase matching", () => {
+    setPageTextForLinks("What are you wanting certification in?");
+
+    const input = "See [certification](#scroll:What are you wanting certification in?)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toBe("certification");
+  });
+
+  test("rejects scroll links when phrase is partial match only", () => {
+    setPageTextForLinks("Hello world");
+
+    // "world" exists, but "missing world" doesn't exist as exact phrase
+    const input = "Jump to [section](#scroll:missing world)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).toBeNull();
+    expect(container.textContent).toContain("section");
+  });
+
+  test("handles empty page text gracefully", () => {
+    setPageTextForLinks("");
+
+    const input = "Jump to [section](#scroll:anything)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).toBeNull();
+    expect(container.textContent).toContain("section");
+  });
+
+  test("validates multiple scroll links in same text", () => {
+    setPageTextForLinks("First phrase exists. Second phrase also exists.");
+
+    const input = "See [first](#scroll:First phrase exists) and [second](#scroll:Second phrase also exists)";
+    renderMarkdownInto(container, input);
+
+    const links = container.querySelectorAll("a");
+    expect(links.length).toBe(2);
+    expect(links[0]!.textContent).toBe("first");
+    expect(links[1]!.textContent).toBe("second");
+  });
+
+  test("validates and filters mixed valid/invalid scroll links", () => {
+    setPageTextForLinks("Valid phrase exists here");
+
+    const input = "See [valid](#scroll:Valid phrase exists) and [invalid](#scroll:This does not exist)";
+    renderMarkdownInto(container, input);
+
+    const links = container.querySelectorAll("a");
+    expect(links.length).toBe(1);
+    expect(links[0]!.textContent).toBe("valid");
+    expect(container.textContent).toContain("invalid"); // Should be plain text
+  });
+
+  test("handles special characters in scroll link phrases", () => {
+    setPageTextForLinks("Question: What's your name? (Required)");
+
+    const input = "See [question](#scroll:Question: What's your name? (Required))";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toBe("question");
+  });
+
+  test("validates scroll links with whitespace normalization", () => {
+    setPageTextForLinks("Multiple   spaces   here");
+
+    // Should match even with different whitespace in the link
+    const input = "See [link](#scroll:Multiple spaces here)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toBe("link");
+  });
+
+  test("validates scroll links with lenient whitespace matching for code blocks", () => {
+    // Simulate code block text that might have different whitespace
+    setPageTextForLinks("type Query { me: User } type User { name: String }");
+
+    // AI might try to match with different whitespace formatting
+    const input = "See [code](#scroll:type Query {me: User})";
+    renderMarkdownInto(container, input);
+
+    // Should match with lenient whitespace (no spaces between braces)
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toBe("code");
+  });
+
+  test("rejects scroll links that don't match even with lenient whitespace", () => {
+    setPageTextForLinks("type Query { me: User }");
+
+    // Completely different phrase
+    const input = "See [code](#scroll:completely different text)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).toBeNull();
+    expect(container.textContent).toContain("code");
   });
 
   test("renders plain text when href is nonsense", () => {

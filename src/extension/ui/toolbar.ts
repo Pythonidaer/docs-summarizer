@@ -1,9 +1,7 @@
 // src/extension/ui/toolbar.ts
 import { PROMPT_VOICES } from "../prompts/voices";
 import {
-  AVAILABLE_MODELS,
   AVAILABLE_REASONING_LEVELS,
-  AVAILABLE_VERBOSITY_LEVELS,
 } from "../constants";
 import { getBlurEnabled, setBlurEnabled } from "./focusBlur";
 
@@ -12,11 +10,10 @@ export interface ToolbarElements {
   instructionsCheckbox: HTMLInputElement;
   blurCheckbox: HTMLInputElement;
   voiceSelect: HTMLSelectElement;
-  modelSelect: HTMLSelectElement;
   reasoningSelect: HTMLSelectElement;
-  verbositySelect: HTMLSelectElement;
   summarizeBtn: HTMLButtonElement;
   clearHighlightsBtn: HTMLButtonElement;
+  detachBtn: HTMLButtonElement;
 }
 
 function createLabeledCheckbox(labelText: string): {
@@ -112,7 +109,7 @@ function createPromptVoiceSelect(): HTMLSelectElement {
 
 /**
  * Layout:
- *   Row 1: [Model] [Reason] [Verbosity]         [Voice]
+ *   Row 1: [Reason]         [Voice]
  *   Row 2: [Use custom instructions] [Blur page]   [Summarize] [Clear]
  */
 export function createToolbar(): ToolbarElements {
@@ -125,7 +122,7 @@ export function createToolbar(): ToolbarElements {
     marginBottom: "8px",
   } as CSSStyleDeclaration);
 
-  // ----- Row 1: model / reason / verbosity + voice -----
+  // ----- Row 1: reason + voice -----
   const row1 = document.createElement("div");
   Object.assign(row1.style, {
     display: "flex",
@@ -151,20 +148,10 @@ export function createToolbar(): ToolbarElements {
     flexWrap: "wrap",
   } as CSSStyleDeclaration);
 
-  const { container: modelLabel, select: modelSelect } = createLabeledSelect(
-    "Model:",
-    AVAILABLE_MODELS
-  );
-
   const {
     container: reasoningLabel,
     select: reasoningSelect,
-  } = createLabeledSelect("Reason:", AVAILABLE_REASONING_LEVELS);
-
-  const {
-    container: verbosityLabel,
-    select: verbositySelect,
-  } = createLabeledSelect("Verbosity:", AVAILABLE_VERBOSITY_LEVELS);
+  } = createLabeledSelect("Reasoning:", AVAILABLE_REASONING_LEVELS);
 
   const voiceLabel = document.createElement("label");
   Object.assign(voiceLabel.style, {
@@ -181,9 +168,7 @@ export function createToolbar(): ToolbarElements {
   voiceLabel.appendChild(voiceText);
   voiceLabel.appendChild(voiceSelect);
 
-  row1Left.appendChild(modelLabel);
   row1Left.appendChild(reasoningLabel);
-  row1Left.appendChild(verbosityLabel);
   row1Right.appendChild(voiceLabel);
 
   row1.appendChild(row1Left);
@@ -259,8 +244,22 @@ export function createToolbar(): ToolbarElements {
     cursor: "pointer",
   } as CSSStyleDeclaration);
 
+  const detachBtn = document.createElement("button");
+  detachBtn.textContent = "Detach to Window";
+  detachBtn.title = "Open in a separate window";
+  Object.assign(detachBtn.style, {
+    padding: "6px 10px",
+    fontSize: "13px",
+    borderRadius: "4px",
+    border: "1px solid rgba(255,255,255,0.25)",
+    background: "#6366f1",
+    color: "#ffffff",
+    cursor: "pointer",
+  } as CSSStyleDeclaration);
+
   row2Right.appendChild(summarizeBtn);
   row2Right.appendChild(clearHighlightsBtn);
+  row2Right.appendChild(detachBtn);
 
   row2.appendChild(row2Left);
   row2.appendChild(row2Right);
@@ -274,10 +273,9 @@ export function createToolbar(): ToolbarElements {
     instructionsCheckbox,
     blurCheckbox,
     voiceSelect,
-    modelSelect,
     reasoningSelect,
-    verbositySelect,
     summarizeBtn,
     clearHighlightsBtn,
+    detachBtn,
   };
 }

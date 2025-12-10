@@ -1,7 +1,23 @@
-import { buildInstructions, buildInputForPageSummary, extractTextFromResponse, buildInputForConversation } from "../openai";
+import {
+  buildInstructions,
+  buildInputForPageSummary,
+  extractTextFromResponse,
+  buildInputForConversation,
+  callOpenAI,
+  summarizeWithOpenAI,
+  chatWithOpenAI,
+} from "../openai";
 import { BASE_SYSTEM_INSTRUCTIONS, MARKDOWN_FORMAT_HINT } from "../constants";
-import { Message } from "../types";
+import { Message, ModelSettings } from "../types";
 import { getPromptVoiceInstructions, PromptVoiceId } from "../prompts/voices";
+import { ensureApiKey } from "../storage/apiKey";
+
+// Mock ensureApiKey
+jest.mock("../storage/apiKey", () => ({
+  ensureApiKey: jest.fn(),
+}));
+
+const mockEnsureApiKey = ensureApiKey as jest.MockedFunction<typeof ensureApiKey>;
 
 describe("buildInstructions", () => {
   const CUSTOM_TEXT = "Custom layer instructions.";
@@ -163,5 +179,346 @@ describe("buildInputForConversation", () => {
 
     // We no longer show "(No prior conversation.)"
     expect(result).not.toContain("(No prior conversation.)");
+  });
+});
+
+describe("callOpenAI", () => {
+  const mockFetch = jest.fn();
+  const defaultModelSettings: ModelSettings = {
+    model: "gpt-5-nano",
+    reasoningEffort: "low",
+    verbosity: "low",
+  };
+
+  beforeAll(() => {
+    global.fetch = mockFetch;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureApiKey.mockResolvedValue("sk-test-key");
+  });
+
+  test("successfully calls OpenAI API and returns text", async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        status: "completed",
+        output_text: "This is the response text",
+      }),
+    };
+    mockFetch.mockResolvedValue(mockResponse);
+
+    const result = await callOpenAI(
+      "Test input",
+      "Test instructions",
+      defaultModelSettings,
+      "summary"
+    );
+
+    expect(result).toBe("This is the response text");
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/responses",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer sk-test-key",
+          "Content-Type": "application/json",
+        }),
+        body: expect.stringContaining('"model":"gpt-5-nano"'),
+      })
+    );
+  });
+
+  test("throws error when API key is missing", async () => {
+    mockEnsureApiKey.mockResolvedValue(null);
+
+    await expect(
+      callOpenAI("Test input", "Test instructions", defaultModelSettings, "summary")
+    ).rejects.toThrow("API key missing");
+  });
+
+  test("throws error on HTTP error status", async () => {
+    const mockResponse = {
+      ok: false,
+      status: 401,
+      json: jest.fn().mockResolvedValue({
+        error: { message: "Invalid API key" },
+      }),
+    };
+    mockFetch.mockResolvedValue(mockResponse);
+
+    await expect(
+      callOpenAI("Test input", "Test instructions", defaultModelSettings, "summary")
+    ).rejects.toThrow("OpenAI error: Invalid API key");
+  });
+
+  test("throws error on invalid JSON response", async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: jest.fn().mockRejectedValue(new Error("Invalid JSON")),
+    };
+    mockFetch.mockResolvedValue(mockResponse);
+
+    await expect(
+      callOpenAI("Test input", "Test instructions", defaultModelSettings, "summary")
+    ).rejects.toThrow("OpenAI error (invalid JSON");
+  });
+
+  test("throws error when response status is not 'completed'", async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        status: "incomplete",
+        incomplete_details: { reason: "max_tokens" },
+      }),
+    };
+    mockFetch.mockResolvedValue(mockResponse);
+
+    await expect(
+      callOpenAI("Test input", "Test instructions", defaultModelSettings, "summary")
+    ).rejects.toThrow("OpenAI response not completed");
+  });
+
+  test("throws error when response is empty", async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        status: "completed",
+        output: [],
+      }),
+    };
+    mockFetch.mockResolvedValue(mockResponse);
+
+    await expect(
+      callOpenAI("Test input", "Test instructions", defaultModelSettings, "summary")
+    ).rejects.toThrow("empty response");
+  });
+
+  test("extracts text from structured output when output_text is missing", async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        status: "completed",
+        output: [
+          {
+            content: [
+              {
+                type: "output_text",
+                text: "Text from structured output",
+              },
+            ],
+          },
+        ],
+      }),
+    };
+    mockFetch.mockResolvedValue(mockResponse);
+
+    const result = await callOpenAI(
+      "Test input",
+      "Test instructions",
+      defaultModelSettings,
+      "summary"
+    );
+
+    expect(result).toBe("Text from structured output");
+  });
+
+  test("sends correct model settings in request", async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        status: "completed",
+        output_text: "Response",
+      }),
+    };
+    mockFetch.mockResolvedValue(mockResponse);
+
+    const modelSettings: ModelSettings = {
+      model: "gpt-5-mini",
+      reasoningEffort: "medium",
+      verbosity: "high",
+    };
+
+    await callOpenAI("Test input", "Test instructions", modelSettings, "chat");
+
+    const callArgs = mockFetch.mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+
+    expect(body.model).toBe("gpt-5-mini");
+    expect(body.reasoning.effort).toBe("medium");
+    expect(body.text.verbosity).toBe("high");
+  });
+});
+
+describe("summarizeWithOpenAI", () => {
+  const mockFetch = jest.fn();
+  const defaultModelSettings: ModelSettings = {
+    model: "gpt-5-nano",
+    reasoningEffort: "low",
+    verbosity: "low",
+  };
+
+  beforeAll(() => {
+    global.fetch = mockFetch;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureApiKey.mockResolvedValue("sk-test-key");
+  });
+
+  test("calls OpenAI with correct summary input", async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        status: "completed",
+        output_text: "Summary response",
+      }),
+    };
+    mockFetch.mockResolvedValue(mockResponse);
+
+    const result = await summarizeWithOpenAI(
+      "Page text content",
+      "Structure summary",
+      false,
+      "",
+      "default",
+      defaultModelSettings
+    );
+
+    expect(result).toBe("Summary response");
+    const callArgs = mockFetch.mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    expect(body.input).toContain("Page text content");
+    expect(body.input).toContain("Structure summary");
+  });
+
+  test("handles null pageStructureSummary", async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        status: "completed",
+        output_text: "Summary",
+      }),
+    };
+    mockFetch.mockResolvedValue(mockResponse);
+
+    await summarizeWithOpenAI(
+      "Page text",
+      null,
+      false,
+      "",
+      "default",
+      defaultModelSettings
+    );
+
+    const callArgs = mockFetch.mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    // Should not include structure summary section if null
+    expect(body.input).not.toContain("Structure summary");
+  });
+
+  test("includes custom instructions when enabled", async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        status: "completed",
+        output_text: "Summary",
+      }),
+    };
+    mockFetch.mockResolvedValue(mockResponse);
+
+    await summarizeWithOpenAI(
+      "Page text",
+      null,
+      true,
+      "Custom instruction text",
+      "teacher",
+      defaultModelSettings
+    );
+
+    const callArgs = mockFetch.mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    expect(body.instructions).toContain("Custom instruction text");
+    expect(body.instructions).toContain(getPromptVoiceInstructions("teacher"));
+  });
+});
+
+describe("chatWithOpenAI", () => {
+  const mockFetch = jest.fn();
+  const defaultModelSettings: ModelSettings = {
+    model: "gpt-5-nano",
+    reasoningEffort: "low",
+    verbosity: "low",
+  };
+
+  beforeAll(() => {
+    global.fetch = mockFetch;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureApiKey.mockResolvedValue("sk-test-key");
+  });
+
+  test("calls OpenAI with conversation history", async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        status: "completed",
+        output_text: "Chat response",
+      }),
+    };
+    mockFetch.mockResolvedValue(mockResponse);
+
+    const history: Message[] = [
+      { id: "1", role: "user", text: "Question 1" },
+      { id: "2", role: "assistant", text: "Answer 1" },
+    ];
+
+    const result = await chatWithOpenAI(
+      "Page text",
+      history,
+      false,
+      "",
+      "default",
+      defaultModelSettings
+    );
+
+    expect(result).toBe("Chat response");
+    const callArgs = mockFetch.mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    expect(body.input).toContain("Page text");
+    expect(body.input).toContain("Question 1");
+    expect(body.input).toContain("Answer 1");
+  });
+
+  test("handles empty conversation history", async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        status: "completed",
+        output_text: "Response",
+      }),
+    };
+    mockFetch.mockResolvedValue(mockResponse);
+
+    await chatWithOpenAI("Page text", [], false, "", "default", defaultModelSettings);
+
+    const callArgs = mockFetch.mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    expect(body.input).toContain("(No prior conversation.)");
   });
 });

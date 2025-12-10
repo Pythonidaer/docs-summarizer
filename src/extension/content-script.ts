@@ -22,7 +22,7 @@ import { createToolbar } from "./ui/toolbar";
 import { createMainArea } from "./ui/mainArea";
 import { DRAWER_STYLE_CSS, GLOBAL_HIGHLIGHT_STYLE_CSS } from "./ui/styles";
 import { setPageTextForLinks } from "./pageText";
-import { clearAllHighlights } from "./highlight";
+import { clearAllHighlights, scrollToPageMatch } from "./highlight";
 import type { PromptVoiceId } from "./prompts/voices";
 import { wireDrawerEvents } from "./ui/events";
 import {
@@ -137,27 +137,24 @@ function createDrawerUI(): void {
     toolbar,
     instructionsCheckbox,
     voiceSelect,
-    modelSelect,
     reasoningSelect,
-    verbositySelect,
     summarizeBtn,
     clearHighlightsBtn,
+    detachBtn,
     blurCheckbox,
   } = createToolbar();
 
   const syncModelSettings = () => {
     currentModelSettings = {
-      model: modelSelect.value as ModelId,
+      model: "gpt-5-nano", // Hard-coded: always use gpt-5-nano
       reasoningEffort: reasoningSelect.value as ReasoningEffort,
-      verbosity: verbositySelect.value as VerbosityLevel,
+      verbosity: "low", // Hard-coded: always use low
     };
   };
 
-  // Initialize from defaults and keep in sync with selects
+  // Initialize from defaults and keep in sync with reasoning select
   syncModelSettings();
-  modelSelect.addEventListener("change", syncModelSettings);
   reasoningSelect.addEventListener("change", syncModelSettings);
-  verbositySelect.addEventListener("change", syncModelSettings);
 
   // Initialize prompt voice from dropdown
   currentPromptVoiceId = voiceSelect.value as PromptVoiceId;
@@ -193,6 +190,42 @@ function createDrawerUI(): void {
   // Clear highlights button
   clearHighlightsBtn.addEventListener("click", () => {
     clearAllHighlights();
+  });
+
+  // Detach to window button
+  detachBtn.addEventListener("click", () => {
+    const state = {
+      pageText,
+      pageStructureSummary,
+      messages: [...messages],
+      settings: {
+        voice: currentPromptVoiceId,
+        model: currentModelSettings.model,
+        reasoning: currentModelSettings.reasoningEffort,
+        verbosity: currentModelSettings.verbosity,
+        useCustomInstructions,
+        customInstructions,
+      },
+      tabId: null, // Will be set by background script
+    };
+
+    chrome.runtime.sendMessage(
+      {
+        type: "OPEN_DETACHED_WINDOW",
+        state,
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.error(
+            "[Docs Summarizer] Error opening detached window:",
+            chrome.runtime.lastError
+          );
+          alert(
+            `Failed to open detached window: ${chrome.runtime.lastError.message}`
+          );
+        }
+      }
+    );
   });
 
   // Footer: chat input + send button
@@ -232,6 +265,15 @@ function createDrawerUI(): void {
   });
 }
 
+
+// Listen for scroll/highlight requests from detached window
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "SCROLL_AND_HIGHLIGHT") {
+    scrollToPageMatch(message.phrase);
+    sendResponse({ success: true });
+  }
+  return true;
+});
 
 // Run when content script loads
 if (document.readyState === "loading") {
