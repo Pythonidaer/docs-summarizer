@@ -1,4 +1,5 @@
 import { DRAWER_ROOT_ID } from "./constants";
+import { getPageTextForLinks } from "./pageText";
 
 let activeHighlights: HTMLElement[] = [];
 
@@ -128,18 +129,47 @@ export function scrollToPageMatch(term: string): void {
 
   // Global guard: check against the full rendered page text first.
   // This protects us if the model invents a phrase that never appears.
-  const fullPageText =
-    (document.body.innerText || document.body.textContent || "").toLowerCase();
+  // IMPORTANT: Use CURRENT page text (not stored snapshot) because:
+  // 1. Page content may have changed since validation
+  // 2. Dynamic content may have loaded
+  // 3. User may have interacted with the page
+  // We still use the same normalization as markdown.ts for consistency
+  const body = document.body;
+  if (!body) {
+    alert("Docs Summarizer: Page body not available.");
+    return;
+  }
+  
+  // Extract current page text using same method as content-script
+  const clone = body.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll("script, style").forEach((el) => el.remove());
+  const raw = ((clone as any).innerText ?? clone.textContent ?? "");
+  const fullPageText = raw.replace(/\s+/g, " ").trim().toLowerCase();
+  
+  // Normalize whitespace for comparison (same as markdown.ts)
+  const normalizedPageText = fullPageText.replace(/\s+/g, " ").trim();
+  const normalizedTerm = lowerTerm.replace(/\s+/g, " ").trim();
+  
+  // Also try ultra-normalized (remove all whitespace) for code blocks
+  const ultraNormalizedPageText = normalizedPageText.replace(/\s/g, "");
+  const ultraNormalizedTerm = normalizedTerm.replace(/\s/g, "");
 
-  if (!fullPageText.includes(lowerTerm)) {
+  const exactMatch = normalizedPageText.includes(normalizedTerm);
+  const lenientMatch = ultraNormalizedPageText.includes(ultraNormalizedTerm);
+
+  if (!exactMatch && !lenientMatch) {
     console.warn(
-      "[Docs Summarizer] Scroll term not found in full page text:",
-      rawTerm
+      "[Docs Summarizer] Scroll term not found in full page text (even with normalization):",
+      rawTerm,
+      "Stored text length:",
+      fullPageText.length,
+      "Sample:",
+      fullPageText.slice(0, 200)
     );
     alert(
       "Docs Summarizer could not find that phrase on this page.\n\n" +
         "The model may have referenced text that is not actually present " +
-        "or used a phrase that only appears in its own summary."
+        "or the page content may have changed since the summary was generated."
     );
     return;
   }

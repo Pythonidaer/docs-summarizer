@@ -3,6 +3,9 @@ import { chatWithOpenAI, summarizeWithOpenAI } from "../openai";
 import { renderMessages } from "./messages";
 import type { Message, ModelSettings } from "../types";
 import type { PromptVoiceId } from "../prompts/voices";
+import { extractPageTextFromDoc } from "../content-script";
+import { extractPageStructure, serializePageStructureForModel } from "../pageStructure";
+import { setPageTextForLinks } from "../pageText";
 
 export interface WireDrawerEventsArgs {
   root: HTMLDivElement;
@@ -117,18 +120,62 @@ export function wireDrawerEvents({
 
   summarizeBtn.addEventListener("click", async () => {
     try {
-      if (!pageText) {
-        alert("Docs Summarizer: No text found on this page.");
-        return;
+      // Re-extract text if empty (handles SPAs that load content dynamically)
+      let currentPageText = pageText;
+      let currentPageStructureSummary = pageStructureSummary;
+      
+      if (!currentPageText || currentPageText.trim().length === 0) {
+        summarizeBtn.disabled = true;
+        const previousLabel = summarizeBtn.textContent;
+        summarizeBtn.textContent = "Loading content…";
+        
+        // Try extracting immediately
+        currentPageText = extractPageTextFromDoc(document);
+        
+        // If still empty, wait a bit and retry (for SPAs that load content asynchronously)
+        if (!currentPageText || currentPageText.trim().length === 0) {
+          await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
+          currentPageText = extractPageTextFromDoc(document);
+        }
+        
+        // If still empty after retry, wait a bit more
+        if (!currentPageText || currentPageText.trim().length === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait another 1s
+          currentPageText = extractPageTextFromDoc(document);
+        }
+        
+        // Re-extract structure if we got new text
+        if (currentPageText && currentPageText.trim().length > 0) {
+          const structure = extractPageStructure(document);
+          currentPageStructureSummary = serializePageStructureForModel(structure);
+          setPageTextForLinks(currentPageText);
+        }
+        
+        if (!currentPageText || currentPageText.trim().length === 0) {
+          alert(
+            "Docs Summarizer: No text found on this page.\n\n" +
+            "This may be because:\n" +
+            "• The page content hasn't loaded yet (try waiting a moment and clicking again)\n" +
+            "• The page uses a format we can't extract text from\n" +
+            "• The page is empty or contains only images/media"
+          );
+          summarizeBtn.disabled = false;
+          summarizeBtn.textContent = previousLabel;
+          return;
+        }
+        
+        summarizeBtn.textContent = "Summarizing…";
       }
 
       summarizeBtn.disabled = true;
       const previousLabel = summarizeBtn.textContent;
-      summarizeBtn.textContent = "Summarizing…";
+      if (summarizeBtn.textContent !== "Summarizing…") {
+        summarizeBtn.textContent = "Summarizing…";
+      }
 
       const summary = await summarizeWithOpenAI(
-        pageText,
-        pageStructureSummary,
+        currentPageText,
+        currentPageStructureSummary,
         getUseCustomInstructions(),
         getCustomInstructions(),
         getPromptVoiceId(),

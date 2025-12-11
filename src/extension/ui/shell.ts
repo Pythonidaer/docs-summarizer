@@ -2,7 +2,7 @@ import {
     DRAWER_ROOT_ID,
     DRAWER_PANEL_ID,
     DRAWER_HANDLE_ID,
-} from "../constants.js";
+} from "../constants";
 
 export interface DrawerShell {
   root: HTMLDivElement;

@@ -46,7 +46,7 @@ let currentModelSettings: ModelSettings = { ...DEFAULT_MODEL_SETTINGS };
  * Extracts readable page text from the current document.
  * This stays local to the content script since it depends on `document`.
  */
-function extractPageTextFromDoc(doc: Document): string {
+export function extractPageTextFromDoc(doc: Document): string {
   const body = doc.body;
   if (!body) return "";
 
@@ -74,8 +74,17 @@ export function setDrawerOpen(
 ): void {
   drawer.style.transform = isOpen ? "translateX(0)" : "translateX(100%)";
 
-  // Closed: handle at viewport edge; open: aligned with drawer inner edge.
-  handle.style.right = isOpen ? `${DRAWER_WIDTH_PX}px` : "0";
+  if (isOpen) {
+    // Get the actual rendered width of the drawer (respects maxWidth: 80vw)
+    // This ensures the handle aligns correctly even in split-screen mode
+    const drawerRect = drawer.getBoundingClientRect();
+    const actualDrawerWidth = drawerRect.width;
+    handle.style.right = `${actualDrawerWidth}px`;
+  } else {
+    // Closed: handle at viewport edge
+    handle.style.right = "0";
+  }
+  
   handle.textContent = isOpen ? ">" : "<";
 
   if (isOpen) {

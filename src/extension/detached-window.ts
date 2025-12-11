@@ -26,6 +26,8 @@ let currentPromptVoiceId: PromptVoiceId = "default";
 let currentModelSettings: ModelSettings = { ...DEFAULT_MODEL_SETTINGS };
 let pageText = "";
 let pageStructureSummary = "";
+let originalTabId: number | null = null; // Preserve the original tabId from state
+let originalPageUrl: string | null = null; // Store the original page URL for fallback lookup
 
 // Load state from background script
 chrome.runtime.sendMessage(
@@ -57,6 +59,10 @@ chrome.runtime.sendMessage(
       reasoningEffort: state.settings?.reasoning || "low",
       verbosity: state.settings?.verbosity || "low",
     };
+
+    // Preserve the original tabId and pageUrl from state (important for scroll links)
+    originalTabId = state.tabId || null;
+    originalPageUrl = state.pageUrl || null;
 
     setPageTextForLinks(pageText);
     initializeUI();
@@ -218,7 +224,8 @@ function updateState(): void {
       useCustomInstructions,
       customInstructions,
     },
-    tabId: null,
+    tabId: originalTabId, // Preserve the original tabId
+    pageUrl: originalPageUrl, // Preserve the original pageUrl for fallback lookup
   };
 
   chrome.runtime.sendMessage(

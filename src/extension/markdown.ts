@@ -120,6 +120,25 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
                     "[Docs Summarizer] Error sending scroll request:",
                     chrome.runtime.lastError
                   );
+                  alert(
+                    `Could not scroll to phrase: ${chrome.runtime.lastError.message}\n\n` +
+                    "The main page may have been refreshed or closed."
+                  );
+                } else if (response && !response.success) {
+                  // Handle error response from background script
+                  console.error("[Docs Summarizer] Scroll failed:", response.error);
+                  const errorMsg = response.error || "Unknown error";
+                  // Check if it's a "connection lost" error that might auto-recover
+                  if (errorMsg.includes("Connection lost") && errorMsg.includes("try clicking the link again")) {
+                    alert(
+                      `Could not scroll to phrase: ${errorMsg}`
+                    );
+                  } else {
+                    alert(
+                      `Could not scroll to phrase: ${errorMsg}\n\n` +
+                      "The main page may have been refreshed or closed."
+                    );
+                  }
                 }
               }
             );
