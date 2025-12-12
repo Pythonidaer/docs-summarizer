@@ -1,8 +1,14 @@
 // src/extension/openai.ts
 import { ensureApiKey } from "./storage/apiKey";
-import { BASE_SYSTEM_INSTRUCTIONS, MARKDOWN_FORMAT_HINT } from "./constants";
-import type { Message, ModelSettings } from "./types";
+import { BASE_SYSTEM_INSTRUCTIONS, MARKDOWN_FORMAT_HINT, GPT5_NANO_PRICING } from "./constants";
+import type { Message, ModelSettings, TokenUsage } from "./types";
 import { getPromptVoiceInstructions, PromptVoiceId } from "./prompts/voices";
+
+export interface OpenAIResponse {
+  text: string;
+  responseTime: number; // in seconds
+  tokenUsage: TokenUsage | null;
+}
 
 export interface BuildInstructionsOptions {
   useCustom: boolean;
@@ -89,12 +95,51 @@ export function buildInputForConversation(
 
 type CallMode = "summary" | "chat";
 
+/**
+ * Extracts token usage from OpenAI API response
+ */
+export function extractTokenUsage(data: any): TokenUsage | null {
+  if (!data?.usage) {
+    return null;
+  }
+
+  const usage = data.usage;
+  
+  // Handle both naming conventions
+  const inputTokens = usage.input_tokens ?? usage.prompt_tokens ?? 0;
+  const outputTokens = usage.output_tokens ?? usage.completion_tokens ?? 0;
+  const totalTokens = usage.total_tokens ?? (inputTokens + outputTokens);
+
+  // If we don't have both input and output, we can't calculate cost accurately
+  if (inputTokens === 0 && outputTokens === 0) {
+    return null;
+  }
+
+  const cost = calculateTokenCost(inputTokens, outputTokens);
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    cost,
+  };
+}
+
+/**
+ * Calculates cost in dollars for gpt-5-nano based on token usage
+ */
+export function calculateTokenCost(inputTokens: number, outputTokens: number): number {
+  const inputCost = (inputTokens / 1_000_000) * GPT5_NANO_PRICING.input;
+  const outputCost = (outputTokens / 1_000_000) * GPT5_NANO_PRICING.output;
+  return inputCost + outputCost;
+}
+
 export async function callOpenAI(
   input: string,
   instructions: string,
   modelSettings: ModelSettings,
   mode: CallMode
-): Promise<string> {
+): Promise<OpenAIResponse> {
   const apiKey = await ensureApiKey();
   if (!apiKey) {
     throw new Error("API key missing");
@@ -106,8 +151,11 @@ export async function callOpenAI(
   );
   console.log("Model settings", modelSettings);
   console.log("Instructions (final composite prompt)", instructions);
-  console.log("Input (first 8000 chars)", input.slice(0, 8000));
+  console.log("Input (first 10000 chars)", input.slice(0, 10000));
   console.groupEnd();
+
+  // Track response time
+  const startTime = performance.now();
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -119,13 +167,16 @@ export async function callOpenAI(
       model: modelSettings.model,
       instructions,
       input,
-      max_output_tokens: 8000,
+      max_output_tokens: modelSettings.maxOutputTokens,
       reasoning: { effort: modelSettings.reasoningEffort },
       text: {
         verbosity: modelSettings.verbosity,
       },
     }),
   });
+
+  const endTime = performance.now();
+  const responseTime = (endTime - startTime) / 1000; // Convert to seconds
 
   const status = response.status;
   let data: any;
@@ -144,6 +195,7 @@ export async function callOpenAI(
   console.log("response.status field", data?.status);
   console.log("response.incomplete_details", data?.incomplete_details);
   console.log("response.error", data?.error);
+  console.log("response.usage", data?.usage);
   console.groupEnd();
 
   // HTTP-level error
@@ -166,11 +218,24 @@ export async function callOpenAI(
 
   // Responses API status field (completed / incomplete / failed / cancelled)
   if (data?.status && data.status !== "completed") {
+    const tokenUsage = extractTokenUsage(data);
+    let tokenInfo = "";
+    
+    if (data?.incomplete_details?.reason === "max_tokens" || data?.status === "incomplete") {
+      if (tokenUsage) {
+        tokenInfo = ` (Used ${tokenUsage.totalTokens.toLocaleString()} tokens, max was ${modelSettings.maxOutputTokens?.toLocaleString() || modelSettings.maxOutputTokens})`;
+      } else if (data?.usage?.total_tokens) {
+        tokenInfo = ` (Used ${data.usage.total_tokens.toLocaleString()} tokens, max was ${modelSettings.maxOutputTokens?.toLocaleString() || modelSettings.maxOutputTokens})`;
+      } else {
+        tokenInfo = ` (Max tokens: ${modelSettings.maxOutputTokens?.toLocaleString() || modelSettings.maxOutputTokens})`;
+      }
+    }
+    
     const details = data?.incomplete_details
       ? ` – details: ${JSON.stringify(data.incomplete_details)}`
       : "";
     throw new Error(
-      `OpenAI response not completed (status: ${data.status})${details}`
+      `OpenAI response not completed (status: ${data.status})${tokenInfo}${details}`
     );
   }
 
@@ -184,7 +249,14 @@ export async function callOpenAI(
     );
   }
 
-  return summaryText;
+  // Extract token usage
+  const tokenUsage = extractTokenUsage(data);
+
+  return {
+    text: summaryText,
+    responseTime,
+    tokenUsage,
+  };
 }
 
 // ------------ High-level helpers --------------
@@ -196,7 +268,7 @@ export async function summarizeWithOpenAI(
   customInstructions: string,
   promptVoiceId: PromptVoiceId,
   modelSettings: ModelSettings
-): Promise<string> {
+): Promise<OpenAIResponse> {
   const input = buildInputForPageSummary(pageText, pageStructureSummary ?? "");
 
   const instructions = buildInstructions({
@@ -217,7 +289,7 @@ export async function chatWithOpenAI(
   customInstructions: string,
   promptVoiceId: PromptVoiceId,
   modelSettings: ModelSettings
-): Promise<string> {
+): Promise<OpenAIResponse> {
   const input = buildInputForConversation(pageText, history);
 
   const instructions = buildInstructions({

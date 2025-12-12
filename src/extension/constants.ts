@@ -126,8 +126,27 @@ export const AVAILABLE_VERBOSITY_LEVELS: {
   { id: "high", label: "High" },
 ];
 
+// GPT-5-Nano pricing per 1M tokens (Standard tier)
+export const GPT5_NANO_PRICING = {
+  input: 0.05, // $0.05 per 1M input tokens
+  output: 0.40, // $0.40 per 1M output tokens
+};
+
+// Available max output token options
+export const MAX_OUTPUT_TOKEN_OPTIONS: { id: number; label: string }[] = [
+  { id: 1000, label: "1,000" },
+  { id: 2000, label: "2,000" },
+  { id: 4000, label: "4,000" },
+  { id: 8000, label: "8,000" },
+  { id: 10000, label: "10,000" },
+  { id: 16000, label: "16,000" },
+  { id: 32000, label: "32,000" },
+  { id: 64000, label: "64,000" },
+];
+
 export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
   model: "gpt-5-nano", // Hard-coded: always use gpt-5-nano
   reasoningEffort: "low", // Default to low, user can change to medium via UI
   verbosity: "low", // Hard-coded: always use low
+  maxOutputTokens: 8000, // Default max output tokens
 };

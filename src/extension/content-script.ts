@@ -13,10 +13,6 @@ import {
 } from "./constants";
 import { createDrawerShell } from "./ui/shell";
 import { createHeader } from "./ui/header";
-import {
-  createInstructionsPanel,
-  wireInstructionsToggle,
-} from "./ui/instructionsPanel";
 import { createFooter } from "./ui/footer";
 import { createToolbar } from "./ui/toolbar";
 import { createMainArea } from "./ui/mainArea";
@@ -96,6 +92,15 @@ export function setDrawerOpen(
 
 /* Main entry: builds the drawer UI and wires events.*/
 function createDrawerUI(): void {
+  // Don't inject drawer on the detached window page itself (prevents recursive injection)
+  if (typeof window !== "undefined" && window.location) {
+    const url = window.location.href.toLowerCase();
+    if (url.includes("detached-window.html")) {
+      console.log("[Docs Summarizer] Skipping drawer injection on detached window page");
+      return;
+    }
+  }
+
   // Avoid creating multiple drawers if script runs twice
   if (document.getElementById(DRAWER_ROOT_ID)) return;
 
@@ -128,42 +133,37 @@ function createDrawerUI(): void {
   // Header
   const { header, closeButton } = createHeader();
 
-  // Custom instructions panel
-  const {
-    container: instructionsContainer,
-    textarea: instructionsTextarea,
-  } = createInstructionsPanel((value: string) => {
-    if (useCustomInstructions) {
-      customInstructions = value;
-    }
-  });
-
   // Main content area (messages)
   const { main } = createMainArea(messages);
 
-  // Toolbar (instructions toggle, voice select, summarize / clear buttons, blur toggle)
+  // Toolbar (voice select, summarize / clear buttons, blur toggle)
   const {
     toolbar,
-    instructionsCheckbox,
     voiceSelect,
     reasoningSelect,
+    maxTokensSelect,
     summarizeBtn,
     clearHighlightsBtn,
     detachBtn,
     blurCheckbox,
   } = createToolbar();
 
+  // Set default value for max tokens dropdown
+  maxTokensSelect.value = String(DEFAULT_MODEL_SETTINGS.maxOutputTokens);
+
   const syncModelSettings = () => {
     currentModelSettings = {
       model: "gpt-5-nano", // Hard-coded: always use gpt-5-nano
       reasoningEffort: reasoningSelect.value as ReasoningEffort,
       verbosity: "low", // Hard-coded: always use low
+      maxOutputTokens: parseInt(maxTokensSelect.value, 10),
     };
   };
 
-  // Initialize from defaults and keep in sync with reasoning select
+  // Initialize from defaults and keep in sync with selects
   syncModelSettings();
   reasoningSelect.addEventListener("change", syncModelSettings);
+  maxTokensSelect.addEventListener("change", syncModelSettings);
 
   // Initialize prompt voice from dropdown
   currentPromptVoiceId = voiceSelect.value as PromptVoiceId;
@@ -180,20 +180,6 @@ function createDrawerUI(): void {
     const enabled = blurCheckbox.checked;
     setBlurEnabled(enabled);
     setPageBlur(enabled);
-  });
-
-  // Wire custom instructions checkbox -> panel show/hide + seeding
-  wireInstructionsToggle({
-    checkbox: instructionsCheckbox,
-    container: instructionsContainer,
-    textarea: instructionsTextarea,
-    getUseCustomInstructions: () => useCustomInstructions,
-    setUseCustomInstructions: (value: boolean) => {
-      useCustomInstructions = value;
-    },
-    setCustomInstructions: (value: string) => {
-      customInstructions = value;
-    },
   });
 
   // Clear highlights button
@@ -232,6 +218,9 @@ function createDrawerUI(): void {
           alert(
             `Failed to open detached window: ${chrome.runtime.lastError.message}`
           );
+        } else if (response && response.success !== false) {
+          // Successfully opened detached window - close the drawer
+          setDrawerOpen(root, drawer, handle, false);
         }
       }
     );
@@ -245,7 +234,6 @@ function createDrawerUI(): void {
   drawer.appendChild(content);
   content.appendChild(header);
   content.appendChild(toolbar);
-  content.appendChild(instructionsContainer);
   content.appendChild(main);
   content.appendChild(footer);
 

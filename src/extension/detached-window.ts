@@ -3,10 +3,6 @@
 
 import type { Message, ModelSettings } from "./types";
 import { createHeader } from "./ui/header";
-import {
-  createInstructionsPanel,
-  wireInstructionsToggle,
-} from "./ui/instructionsPanel";
 import { createFooter } from "./ui/footer";
 import { createToolbar } from "./ui/toolbar";
 import { createMainArea } from "./ui/mainArea";
@@ -58,6 +54,7 @@ chrome.runtime.sendMessage(
       model: state.settings?.model || "gpt-5-nano",
       reasoningEffort: state.settings?.reasoning || "low",
       verbosity: state.settings?.verbosity || "low",
+      maxOutputTokens: state.settings?.maxOutputTokens || 8000,
     };
 
     // Preserve the original tabId and pageUrl from state (important for scroll links)
@@ -102,26 +99,15 @@ function initializeUI(): void {
     window.close();
   });
 
-  // Custom instructions panel
-  const {
-    container: instructionsContainer,
-    textarea: instructionsTextarea,
-  } = createInstructionsPanel((value: string) => {
-    if (useCustomInstructions) {
-      customInstructions = value;
-      updateState();
-    }
-  });
-
   // Main content area (messages)
   const { main } = createMainArea(messages);
 
   // Toolbar
   const {
     toolbar,
-    instructionsCheckbox,
     voiceSelect,
     reasoningSelect,
+    maxTokensSelect,
     summarizeBtn,
     clearHighlightsBtn,
     detachBtn,
@@ -132,38 +118,27 @@ function initializeUI(): void {
   detachBtn.style.display = "none";
   blurCheckbox.parentElement!.style.display = "none";
 
+  // Set default value for max tokens dropdown (use restored state or default)
+  maxTokensSelect.value = String(currentModelSettings.maxOutputTokens);
+
   const syncModelSettings = () => {
     currentModelSettings = {
       model: "gpt-5-nano",
       reasoningEffort: reasoningSelect.value as any,
       verbosity: "low",
+      maxOutputTokens: parseInt(maxTokensSelect.value, 10),
     };
     updateState();
   };
 
   syncModelSettings();
   reasoningSelect.addEventListener("change", syncModelSettings);
+  maxTokensSelect.addEventListener("change", syncModelSettings);
 
   currentPromptVoiceId = voiceSelect.value as PromptVoiceId;
   voiceSelect.addEventListener("change", () => {
     currentPromptVoiceId = voiceSelect.value as PromptVoiceId;
     updateState();
-  });
-
-  // Wire custom instructions checkbox
-  wireInstructionsToggle({
-    checkbox: instructionsCheckbox,
-    container: instructionsContainer,
-    textarea: instructionsTextarea,
-    getUseCustomInstructions: () => useCustomInstructions,
-    setUseCustomInstructions: (value: boolean) => {
-      useCustomInstructions = value;
-      updateState();
-    },
-    setCustomInstructions: (value: string) => {
-      customInstructions = value;
-      updateState();
-    },
   });
 
   // Clear highlights button (disabled in detached window, but show message)
@@ -180,7 +155,6 @@ function initializeUI(): void {
   container.appendChild(style);
   container.appendChild(header);
   container.appendChild(toolbar);
-  container.appendChild(instructionsContainer);
   container.appendChild(main);
   container.appendChild(footer);
   app.appendChild(container);

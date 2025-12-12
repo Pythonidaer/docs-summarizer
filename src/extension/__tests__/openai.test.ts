@@ -188,6 +188,7 @@ describe("callOpenAI", () => {
     model: "gpt-5-nano",
     reasoningEffort: "low",
     verbosity: "low",
+    maxOutputTokens: 10000,
   };
 
   beforeAll(() => {
@@ -217,7 +218,9 @@ describe("callOpenAI", () => {
       "summary"
     );
 
-    expect(result).toBe("This is the response text");
+    expect(result.text).toBe("This is the response text");
+    expect(result.responseTime).toBeGreaterThan(0);
+    expect(result.tokenUsage).toBeNull(); // No usage data in mock
     expect(mockFetch).toHaveBeenCalledWith(
       "https://api.openai.com/v1/responses",
       expect.objectContaining({
@@ -326,7 +329,7 @@ describe("callOpenAI", () => {
       "summary"
     );
 
-    expect(result).toBe("Text from structured output");
+    expect(result.text).toBe("Text from structured output");
   });
 
   test("sends correct model settings in request", async () => {
@@ -344,6 +347,7 @@ describe("callOpenAI", () => {
       model: "gpt-5-mini",
       reasoningEffort: "medium",
       verbosity: "high",
+      maxOutputTokens: 10000,
     };
 
     await callOpenAI("Test input", "Test instructions", modelSettings, "chat");
@@ -363,6 +367,7 @@ describe("summarizeWithOpenAI", () => {
     model: "gpt-5-nano",
     reasoningEffort: "low",
     verbosity: "low",
+    maxOutputTokens: 10000,
   };
 
   beforeAll(() => {
@@ -394,7 +399,7 @@ describe("summarizeWithOpenAI", () => {
       defaultModelSettings
     );
 
-    expect(result).toBe("Summary response");
+    expect(result.text).toBe("Summary response");
     const callArgs = mockFetch.mock.calls[0];
     const body = JSON.parse(callArgs[1].body);
     expect(body.input).toContain("Page text content");
@@ -460,6 +465,7 @@ describe("chatWithOpenAI", () => {
     model: "gpt-5-nano",
     reasoningEffort: "low",
     verbosity: "low",
+    maxOutputTokens: 10000,
   };
 
   beforeAll(() => {
@@ -496,7 +502,7 @@ describe("chatWithOpenAI", () => {
       defaultModelSettings
     );
 
-    expect(result).toBe("Chat response");
+    expect(result.text).toBe("Chat response");
     const callArgs = mockFetch.mock.calls[0];
     const body = JSON.parse(callArgs[1].body);
     expect(body.input).toContain("Page text");
@@ -515,7 +521,8 @@ describe("chatWithOpenAI", () => {
     };
     mockFetch.mockResolvedValue(mockResponse);
 
-    await chatWithOpenAI("Page text", [], false, "", "default", defaultModelSettings);
+    const result = await chatWithOpenAI("Page text", [], false, "", "default", defaultModelSettings);
+    expect(result.text).toBe("Response");
 
     const callArgs = mockFetch.mock.calls[0];
     const body = JSON.parse(callArgs[1].body);

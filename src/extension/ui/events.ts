@@ -68,7 +68,7 @@ export function wireDrawerEvents({
       const previousLabel = sendBtn.textContent;
       sendBtn.textContent = "Sending…";
 
-      const reply = await chatWithOpenAI(
+      const result = await chatWithOpenAI(
         pageText,
         messages,
         getUseCustomInstructions(),
@@ -80,7 +80,9 @@ export function wireDrawerEvents({
       messages.push({
         id: `assistant-${Date.now()}`,
         role: "assistant",
-        text: reply,
+        text: result.text,
+        responseTime: result.responseTime,
+        tokenUsage: result.tokenUsage,
       });
       renderMessages(main, messages);
 
@@ -119,6 +121,15 @@ export function wireDrawerEvents({
   });
 
   summarizeBtn.addEventListener("click", async () => {
+    // Add user message to show the summarize action in the chat
+    const userMessageId = `user-${Date.now()}`;
+    messages.push({
+      id: userMessageId,
+      role: "user",
+      text: "Summarize",
+    });
+    renderMessages(main, messages);
+
     try {
       // Re-extract text if empty (handles SPAs that load content dynamically)
       let currentPageText = pageText;
@@ -152,6 +163,13 @@ export function wireDrawerEvents({
         }
         
         if (!currentPageText || currentPageText.trim().length === 0) {
+          // Remove user message since summary failed
+          const userMessageIndex = messages.findIndex(m => m.id === userMessageId);
+          if (userMessageIndex !== -1) {
+            messages.splice(userMessageIndex, 1);
+            renderMessages(main, messages);
+          }
+          
           alert(
             "Docs Summarizer: No text found on this page.\n\n" +
             "This may be because:\n" +
@@ -160,7 +178,7 @@ export function wireDrawerEvents({
             "• The page is empty or contains only images/media"
           );
           summarizeBtn.disabled = false;
-          summarizeBtn.textContent = previousLabel;
+          summarizeBtn.textContent = "Summarize page"; // Always restore to this text
           return;
         }
         
@@ -168,34 +186,42 @@ export function wireDrawerEvents({
       }
 
       summarizeBtn.disabled = true;
-      const previousLabel = summarizeBtn.textContent;
-      if (summarizeBtn.textContent !== "Summarizing…") {
-        summarizeBtn.textContent = "Summarizing…";
-      }
+      summarizeBtn.textContent = "Summarizing…";
 
-      const summary = await summarizeWithOpenAI(
+      const result = await summarizeWithOpenAI(
         currentPageText,
         currentPageStructureSummary,
-        getUseCustomInstructions(),
-        getCustomInstructions(),
+        false, // Don't use custom instructions for summarize button
+        "", // No custom instructions for summarize
         getPromptVoiceId(),
         getModelSettings()
       );
 
+      const voiceId = getPromptVoiceId();
       messages.push({
         id: `assistant-${Date.now()}`,
         role: "assistant",
-        text: summary,
+        text: result.text,
+        voiceId, // Include voiceId so it can be displayed in the message
+        responseTime: result.responseTime,
+        tokenUsage: result.tokenUsage ?? null, // Keep null as null, convert undefined to null
       });
       renderMessages(main, messages);
 
-      summarizeBtn.textContent = previousLabel;
+      summarizeBtn.textContent = "Summarize page"; // Always restore to this text
       summarizeBtn.disabled = false;
     } catch (err: any) {
+      // Remove user message since summary failed
+      const userMessageIndex = messages.findIndex(m => m.id === userMessageId);
+      if (userMessageIndex !== -1) {
+        messages.splice(userMessageIndex, 1);
+        renderMessages(main, messages);
+      }
+      
       console.error("[Docs Summarizer] Error:", err);
       alert(`Docs Summarizer error: ${err?.message ?? String(err)}`);
       summarizeBtn.disabled = false;
-      summarizeBtn.textContent = "Summarize page";
+      summarizeBtn.textContent = "Summarize page"; // Always restore to this text
     }
   });
 

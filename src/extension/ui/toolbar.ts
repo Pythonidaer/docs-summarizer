@@ -2,15 +2,16 @@
 import { PROMPT_VOICES } from "../prompts/voices";
 import {
   AVAILABLE_REASONING_LEVELS,
+  MAX_OUTPUT_TOKEN_OPTIONS,
 } from "../constants";
 import { getBlurEnabled, setBlurEnabled } from "./focusBlur";
 
 export interface ToolbarElements {
   toolbar: HTMLDivElement;
-  instructionsCheckbox: HTMLInputElement;
   blurCheckbox: HTMLInputElement;
   voiceSelect: HTMLSelectElement;
   reasoningSelect: HTMLSelectElement;
+  maxTokensSelect: HTMLSelectElement;
   summarizeBtn: HTMLButtonElement;
   clearHighlightsBtn: HTMLButtonElement;
   detachBtn: HTMLButtonElement;
@@ -109,8 +110,8 @@ function createPromptVoiceSelect(): HTMLSelectElement {
 
 /**
  * Layout:
- *   Row 1: [Reason]         [Voice]
- *   Row 2: [Use custom instructions] [Blur page]   [Summarize] [Clear]
+ *   Row 1: [Reason] [Voice] [Max Tokens] [Blur page]
+ *   Row 2: [Summarize] [Clear] [Detach]
  */
 export function createToolbar(): ToolbarElements {
   const toolbar = document.createElement("div");
@@ -122,7 +123,7 @@ export function createToolbar(): ToolbarElements {
     marginBottom: "8px",
   } as CSSStyleDeclaration);
 
-  // ----- Row 1: reason + voice -----
+  // ----- Row 1: reason + voice + max tokens + blur (all on one line) -----
   const row1 = document.createElement("div");
   Object.assign(row1.style, {
     display: "flex",
@@ -168,42 +169,10 @@ export function createToolbar(): ToolbarElements {
   voiceLabel.appendChild(voiceText);
   voiceLabel.appendChild(voiceSelect);
 
-  row1Left.appendChild(reasoningLabel);
-  row1Right.appendChild(voiceLabel);
-
-  row1.appendChild(row1Left);
-  row1.appendChild(row1Right);
-
-  // ----- Row 2: custom instructions + blur + buttons -----
-  const row2 = document.createElement("div");
-  Object.assign(row2.style, {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "8px",
-    flexWrap: "wrap",
-  } as CSSStyleDeclaration);
-
-  const row2Left = document.createElement("div");
-  Object.assign(row2Left.style, {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    flexWrap: "wrap",
-  } as CSSStyleDeclaration);
-
-  const row2Right = document.createElement("div");
-  Object.assign(row2Right.style, {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    flexWrap: "wrap",
-  } as CSSStyleDeclaration);
-
   const {
-    container: instructionsLabel,
-    checkbox: instructionsCheckbox,
-  } = createLabeledCheckbox("Use custom instructions");
+    container: maxTokensLabel,
+    select: maxTokensSelect,
+  } = createLabeledSelect("Max Tokens:", MAX_OUTPUT_TOKEN_OPTIONS.map(opt => ({ id: String(opt.id), label: opt.label })));
 
   const {
     container: blurLabel,
@@ -216,8 +185,23 @@ export function createToolbar(): ToolbarElements {
     setBlurEnabled(blurCheckbox.checked);
   });
 
-  row2Left.appendChild(instructionsLabel);
-  row2Left.appendChild(blurLabel);
+  row1Left.appendChild(reasoningLabel);
+  row1Left.appendChild(voiceLabel);
+  row1Left.appendChild(maxTokensLabel);
+  row1Right.appendChild(blurLabel);
+
+  row1.appendChild(row1Left);
+  row1.appendChild(row1Right);
+
+  // ----- Row 2: buttons -----
+  const row2 = document.createElement("div");
+  Object.assign(row2.style, {
+    display: "flex",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
+  } as CSSStyleDeclaration);
 
   const summarizeBtn = document.createElement("button");
   summarizeBtn.id = "docs-summarizer-summarize-btn";
@@ -257,12 +241,9 @@ export function createToolbar(): ToolbarElements {
     cursor: "pointer",
   } as CSSStyleDeclaration);
 
-  row2Right.appendChild(summarizeBtn);
-  row2Right.appendChild(clearHighlightsBtn);
-  row2Right.appendChild(detachBtn);
-
-  row2.appendChild(row2Left);
-  row2.appendChild(row2Right);
+  row2.appendChild(summarizeBtn);
+  row2.appendChild(clearHighlightsBtn);
+  row2.appendChild(detachBtn);
 
   // Assemble
   toolbar.appendChild(row1);
@@ -270,10 +251,10 @@ export function createToolbar(): ToolbarElements {
 
   return {
     toolbar,
-    instructionsCheckbox,
     blurCheckbox,
     voiceSelect,
     reasoningSelect,
+    maxTokensSelect,
     summarizeBtn,
     clearHighlightsBtn,
     detachBtn,
