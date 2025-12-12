@@ -253,8 +253,7 @@ export function scrollToPageMatch(term: string): void {
     range.setEnd(textNode, index + lowerTerm.length);
 
     const span = document.createElement("span");
-    span.style.backgroundColor = "rgba(249, 115, 22, 0.12)";
-    span.style.outline = "2px solid #f97316";
+    span.style.backgroundColor = "#FFD6A5"; // Light orange/peach for spanned highlights
     span.style.borderRadius = "2px";
     span.style.padding = "0 1px";
 

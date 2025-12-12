@@ -64,7 +64,7 @@ describe("wireDrawerEvents - summarize button", () => {
     chatInput = document.createElement("textarea");
     sendBtn = document.createElement("button");
     summarizeBtn = document.createElement("button");
-    summarizeBtn.textContent = "Summarize page";
+    summarizeBtn.textContent = "Summarize";
     main = document.createElement("div");
     document.body.appendChild(main);
 
@@ -317,7 +317,7 @@ describe("wireDrawerEvents - summarize button", () => {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     // Button should restore to "Summarize page" regardless of previous state
-    expect(summarizeBtn.textContent).toBe("Summarize page");
+    expect(summarizeBtn.textContent).toBe("Summarize");
     expect(summarizeBtn.disabled).toBe(false);
   });
 
@@ -352,7 +352,7 @@ describe("wireDrawerEvents - summarize button", () => {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     // Button should restore to "Summarize page" even if it was "Summarizing…" before
-    expect(summarizeBtn.textContent).toBe("Summarize page");
+    expect(summarizeBtn.textContent).toBe("Summarize");
   });
 
   test("summarize does not use custom instructions (only prompt voice)", async () => {

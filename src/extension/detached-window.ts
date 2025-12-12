@@ -102,31 +102,61 @@ function initializeUI(): void {
   // Main content area (messages)
   const { main } = createMainArea(messages);
 
-  // Toolbar
+  // Toolbar (now minimal - controls moved to footer)
+  const { toolbar } = createToolbar();
+
+  // Footer: chat input + send button + action buttons + settings
   const {
-    toolbar,
-    voiceSelect,
-    reasoningSelect,
-    maxTokensSelect,
+    footer,
+    chatInput,
+    sendBtn,
     summarizeBtn,
     clearHighlightsBtn,
-    detachBtn,
+    newWindowBtn,
+    reasoningSelect,
+    voiceSelect,
+    maxTokensSelect,
     blurCheckbox,
-  } = createToolbar();
+  } = createFooter();
 
-  // Hide detach button and blur checkbox in detached window
-  detachBtn.style.display = "none";
-  blurCheckbox.parentElement!.style.display = "none";
+  // Hide new window button in detached window (can't detach from detached window)
+  newWindowBtn.style.display = "none";
 
-  // Set default value for max tokens dropdown (use restored state or default)
-  maxTokensSelect.value = String(currentModelSettings.maxOutputTokens);
+  // Hide blur checkbox in detached window
+  if (blurCheckbox.parentElement) {
+    blurCheckbox.parentElement.style.display = "none";
+  }
+
+  // Set actual values from restored state (not labels)
+  if (maxTokensSelect.options.length > 1) {
+    const tokenOption = maxTokensSelect.querySelector(`option[value="${currentModelSettings.maxOutputTokens}"]`);
+    if (tokenOption) {
+      maxTokensSelect.value = String(currentModelSettings.maxOutputTokens);
+    }
+  }
+  if (reasoningSelect.options.length > 1) {
+    const reasoningOption = reasoningSelect.querySelector(`option[value="${currentModelSettings.reasoningEffort}"]`);
+    if (reasoningOption) {
+      reasoningSelect.value = currentModelSettings.reasoningEffort;
+    }
+  }
+  if (voiceSelect.options.length > 1) {
+    const voiceOption = voiceSelect.querySelector(`option[value="${currentPromptVoiceId}"]`);
+    if (voiceOption) {
+      voiceSelect.value = currentPromptVoiceId;
+    }
+  }
 
   const syncModelSettings = () => {
+    // Skip empty value (label option)
+    const reasoningValue = reasoningSelect.value || currentModelSettings.reasoningEffort;
+    const maxTokensValue = maxTokensSelect.value || String(currentModelSettings.maxOutputTokens);
+    
     currentModelSettings = {
       model: "gpt-5-nano",
-      reasoningEffort: reasoningSelect.value as any,
+      reasoningEffort: reasoningValue as any,
       verbosity: "low",
-      maxOutputTokens: parseInt(maxTokensSelect.value, 10),
+      maxOutputTokens: parseInt(maxTokensValue, 10),
     };
     updateState();
   };
@@ -135,9 +165,11 @@ function initializeUI(): void {
   reasoningSelect.addEventListener("change", syncModelSettings);
   maxTokensSelect.addEventListener("change", syncModelSettings);
 
-  currentPromptVoiceId = voiceSelect.value as PromptVoiceId;
+  const voiceValue = voiceSelect.value || currentPromptVoiceId;
+  currentPromptVoiceId = voiceValue as PromptVoiceId;
   voiceSelect.addEventListener("change", () => {
-    currentPromptVoiceId = voiceSelect.value as PromptVoiceId;
+    const newValue = voiceSelect.value || currentPromptVoiceId;
+    currentPromptVoiceId = newValue as PromptVoiceId;
     updateState();
   });
 
@@ -147,9 +179,6 @@ function initializeUI(): void {
       "Clear highlights is only available in the main window. Please use the main window to clear highlights."
     );
   });
-
-  // Footer: chat input + send button
-  const { footer, chatInput, sendBtn } = createFooter();
 
   // Assemble UI
   container.appendChild(style);

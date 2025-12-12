@@ -65,8 +65,7 @@ export function wireDrawerEvents({
 
     try {
       sendBtn.disabled = true;
-      const previousLabel = sendBtn.textContent;
-      sendBtn.textContent = "Sending…";
+      sendBtn.style.opacity = "0.5";
 
       const result = await chatWithOpenAI(
         pageText,
@@ -83,16 +82,17 @@ export function wireDrawerEvents({
         text: result.text,
         responseTime: result.responseTime,
         tokenUsage: result.tokenUsage,
+        voiceId: getPromptVoiceId(), // Include voiceId for metadata display
       });
       renderMessages(main, messages);
 
       sendBtn.disabled = false;
-      sendBtn.textContent = previousLabel;
+      sendBtn.style.opacity = "1";
     } catch (err: any) {
       console.error("[Docs Summarizer] Chat error:", err);
       alert(`Docs Summarizer chat error: ${err?.message ?? String(err)}`);
       sendBtn.disabled = false;
-      sendBtn.textContent = "Send";
+      sendBtn.style.opacity = "1";
     }
   };
 
@@ -136,9 +136,9 @@ export function wireDrawerEvents({
       let currentPageStructureSummary = pageStructureSummary;
       
       if (!currentPageText || currentPageText.trim().length === 0) {
-        summarizeBtn.disabled = true;
-        const previousLabel = summarizeBtn.textContent;
-        summarizeBtn.textContent = "Loading content…";
+      summarizeBtn.disabled = true;
+      const previousLabel = summarizeBtn.textContent;
+      summarizeBtn.textContent = "Loading…";
         
         // Try extracting immediately
         currentPageText = extractPageTextFromDoc(document);
@@ -177,16 +177,16 @@ export function wireDrawerEvents({
             "• The page uses a format we can't extract text from\n" +
             "• The page is empty or contains only images/media"
           );
-          summarizeBtn.disabled = false;
-          summarizeBtn.textContent = "Summarize page"; // Always restore to this text
-          return;
+            summarizeBtn.disabled = false;
+            summarizeBtn.textContent = "Summarize"; // Always restore to this text
+            return;
+          }
+          
+          summarizeBtn.textContent = "Summarizing…";
         }
-        
-        summarizeBtn.textContent = "Summarizing…";
-      }
 
-      summarizeBtn.disabled = true;
-      summarizeBtn.textContent = "Summarizing…";
+        summarizeBtn.disabled = true;
+        summarizeBtn.textContent = "Summarizing…";
 
       const result = await summarizeWithOpenAI(
         currentPageText,
@@ -208,8 +208,8 @@ export function wireDrawerEvents({
       });
       renderMessages(main, messages);
 
-      summarizeBtn.textContent = "Summarize page"; // Always restore to this text
-      summarizeBtn.disabled = false;
+        summarizeBtn.textContent = "Summarize"; // Always restore to this text
+        summarizeBtn.disabled = false;
     } catch (err: any) {
       // Remove user message since summary failed
       const userMessageIndex = messages.findIndex(m => m.id === userMessageId);
@@ -221,7 +221,7 @@ export function wireDrawerEvents({
       console.error("[Docs Summarizer] Error:", err);
       alert(`Docs Summarizer error: ${err?.message ?? String(err)}`);
       summarizeBtn.disabled = false;
-      summarizeBtn.textContent = "Summarize page"; // Always restore to this text
+        summarizeBtn.textContent = "Summarize"; // Always restore to this text
     }
   });
 

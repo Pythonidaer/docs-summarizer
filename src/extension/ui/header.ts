@@ -1,3 +1,5 @@
+import { CURSOR_COLORS, CURSOR_SPACING, CURSOR_BORDERS } from "./design";
+
 export function createHeader(): {
   header: HTMLDivElement;
   closeButton: HTMLButtonElement;
@@ -7,34 +9,35 @@ export function createHeader(): {
     flex: "0 0 auto",
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end", // Align close button to the right
     marginBottom: "10px",
     paddingBottom: "6px",
     borderBottom: "1px solid rgba(255,255,255,0.12)",
   } as CSSStyleDeclaration);
 
-  const title = document.createElement("div");
-  title.textContent = "Docs Summarizer";
-  Object.assign(title.style, {
-    fontWeight: "700",
-    fontSize: "16px",
-    letterSpacing: "0.02em",
-  } as CSSStyleDeclaration);
-
   const closeButton = document.createElement("button");
   closeButton.textContent = "×";
   Object.assign(closeButton.style, {
-    marginLeft: "8px",
+    marginLeft: "auto", // Push to the right
     border: "none",
     background: "transparent",
-    color: "#f5f5f5",
+    color: CURSOR_COLORS.textPrimary,
     fontSize: "18px",
     cursor: "pointer",
-    padding: "0 4px",
+    padding: `${CURSOR_SPACING.xs} ${CURSOR_SPACING.md}`, // Cubic padding (4px vertical, 8px horizontal)
+    borderRadius: CURSOR_BORDERS.radius.sm, // Rounded corners
     lineHeight: "1",
+    transition: "background-color 0.2s",
   } as CSSStyleDeclaration);
 
-  header.appendChild(title);
+  // Hover effect: show rounded rectangle background
+  closeButton.addEventListener("mouseenter", () => {
+    closeButton.style.background = CURSOR_COLORS.buttonSecondary; // Dark grey background
+  });
+  closeButton.addEventListener("mouseleave", () => {
+    closeButton.style.background = "transparent";
+  });
+
   header.appendChild(closeButton);
 
   return { header, closeButton };

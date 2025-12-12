@@ -75,13 +75,29 @@ export function setDrawerOpen(
     // This ensures the handle aligns correctly even in split-screen mode
     const drawerRect = drawer.getBoundingClientRect();
     const actualDrawerWidth = drawerRect.width;
+    // Position handle's right edge at drawer's left edge (no gap)
     handle.style.right = `${actualDrawerWidth}px`;
+    handle.style.transform = "translateY(-50%)";
   } else {
     // Closed: handle at viewport edge
     handle.style.right = "0";
+    handle.style.transform = "translateY(-50%)";
   }
   
-  handle.textContent = isOpen ? ">" : "<";
+  // Update arrow SVG direction and tooltip
+  const arrowSvg = handle.querySelector("svg");
+  const arrowPath = arrowSvg?.querySelector("path");
+  if (arrowPath) {
+    if (isOpen) {
+      // Right arrow (drawer is open, arrow points right to close)
+      arrowPath.setAttribute("d", "M5 12h14M12 5l7 7-7 7");
+      handle.title = "Close Chat Window";
+    } else {
+      // Left arrow (drawer is closed, arrow points left to open)
+      arrowPath.setAttribute("d", "M19 12H5M12 19l-7-7 7-7");
+      handle.title = "Open Chat Window";
+    }
+  }
 
   if (isOpen) {
     root.classList.add("docs-summarizer--open");
@@ -136,39 +152,53 @@ function createDrawerUI(): void {
   // Main content area (messages)
   const { main } = createMainArea(messages);
 
-  // Toolbar (voice select, summarize / clear buttons, blur toggle)
+  // Toolbar (now minimal - controls moved to footer)
+  const { toolbar } = createToolbar();
+
+  // Footer: chat input + send button + action buttons + settings
   const {
-    toolbar,
-    voiceSelect,
-    reasoningSelect,
-    maxTokensSelect,
+    footer,
+    chatInput,
+    sendBtn,
     summarizeBtn,
     clearHighlightsBtn,
-    detachBtn,
+    newWindowBtn,
+    reasoningSelect,
+    voiceSelect,
+    maxTokensSelect,
     blurCheckbox,
-  } = createToolbar();
+  } = createFooter();
 
-  // Set default value for max tokens dropdown
-  maxTokensSelect.value = String(DEFAULT_MODEL_SETTINGS.maxOutputTokens);
+  // Keep labels as default (empty value shows the label)
+  // Users will see "Reasoning", "Voice", "Max Tokens" until they select a value
+  // We'll use the actual defaults when syncing, but show labels in UI
 
   const syncModelSettings = () => {
+    // Use selected value, or default to actual defaults if label is still selected
+    const reasoningValue = reasoningSelect.value || "low";
+    const maxTokensValue = maxTokensSelect.value || String(DEFAULT_MODEL_SETTINGS.maxOutputTokens);
+    
     currentModelSettings = {
       model: "gpt-5-nano", // Hard-coded: always use gpt-5-nano
-      reasoningEffort: reasoningSelect.value as ReasoningEffort,
+      reasoningEffort: reasoningValue as ReasoningEffort,
       verbosity: "low", // Hard-coded: always use low
-      maxOutputTokens: parseInt(maxTokensSelect.value, 10),
+      maxOutputTokens: parseInt(maxTokensValue, 10),
     };
   };
-
-  // Initialize from defaults and keep in sync with selects
+  
+  // Initialize with defaults (but UI shows labels)
   syncModelSettings();
+
+  // Keep in sync with selects
   reasoningSelect.addEventListener("change", syncModelSettings);
   maxTokensSelect.addEventListener("change", syncModelSettings);
 
   // Initialize prompt voice from dropdown
-  currentPromptVoiceId = voiceSelect.value as PromptVoiceId;
+  const voiceValue = voiceSelect.value || "default";
+  currentPromptVoiceId = voiceValue as PromptVoiceId;
   voiceSelect.addEventListener("change", () => {
-    currentPromptVoiceId = voiceSelect.value as PromptVoiceId;
+    const newValue = voiceSelect.value || "default";
+    currentPromptVoiceId = newValue as PromptVoiceId;
   });
 
   // --- Blur toggle: off by default; independent of drawer open/close ---
@@ -187,8 +217,8 @@ function createDrawerUI(): void {
     clearAllHighlights();
   });
 
-  // Detach to window button
-  detachBtn.addEventListener("click", () => {
+  // New window button (formerly "Detach to Window")
+  newWindowBtn.addEventListener("click", () => {
     const state = {
       pageText,
       pageStructureSummary,
@@ -225,9 +255,6 @@ function createDrawerUI(): void {
       }
     );
   });
-
-  // Footer: chat input + send button
-  const { footer, chatInput, sendBtn } = createFooter();
 
   // Assemble drawer content
   drawer.appendChild(style);

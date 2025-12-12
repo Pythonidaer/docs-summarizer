@@ -38,7 +38,7 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
             borderRadius: "6px",
             whiteSpace: "pre-wrap",
             lineHeight: "1.4",
-            background: msg.role === "user" ? "#2563eb" : "#1d1d1d",
+            background: msg.role === "user" ? "#4a5568" : "#1d1d1d", // Muted grey/blue for user messages
             color: "#f5f5f5",
             border: msg.role === "user"
                 ? "1px solid rgba(255,255,255,0.15)"
@@ -48,16 +48,8 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
         } as CSSStyleDeclaration);
 
         if (msg.role === "assistant") {
-            // Add voice label to assistant messages if voiceId is present
-            let textToRender = msg.text;
-            if (msg.voiceId) {
-                const voice = PROMPT_VOICES.find(v => v.id === msg.voiceId);
-                const voiceLabel = voice?.label || msg.voiceId;
-                // Prepend voice label as a heading
-                textToRender = `## Summary (${voiceLabel})\n\n${msg.text}`;
-            }
             // Render assistant messages with simple markdown formatting
-            renderMarkdownInto(bubble, textToRender);
+            renderMarkdownInto(bubble, msg.text);
 
             // Add metadata footer (response time, tokens, cost) in bottom-right
             if (msg.responseTime !== undefined || msg.tokenUsage) {
@@ -82,6 +74,13 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
                 } as CSSStyleDeclaration);
 
                 const parts: string[] = [];
+                
+                // Add voice label first if present
+                if (msg.voiceId) {
+                    const voice = PROMPT_VOICES.find(v => v.id === msg.voiceId);
+                    const voiceLabel = voice?.label || msg.voiceId;
+                    parts.push(voiceLabel);
+                }
                 
                 if (msg.responseTime !== undefined) {
                     parts.push(`Response time: ${msg.responseTime.toFixed(1)}s`);
@@ -139,7 +138,14 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
                     gap: "8px",
                 } as CSSStyleDeclaration);
 
-                metadata.textContent = parts.join(" • ");
+                // Join parts with separator, but style voice label differently if present
+                if (msg.voiceId && parts.length > 0) {
+                    const voiceLabel = parts[0];
+                    const rest = parts.slice(1);
+                    metadata.innerHTML = `<span style="font-weight: 500;">${voiceLabel}</span>${rest.length > 0 ? " • " + rest.join(" • ") : ""}`;
+                } else {
+                    metadata.textContent = parts.join(" • ");
+                }
                 // Align metadata text to the right
                 Object.assign(metadata.style, {
                     textAlign: "right",

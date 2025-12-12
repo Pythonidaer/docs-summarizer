@@ -70,13 +70,14 @@ describe("renderMessages", () => {
     }
   });
 
-  test("includes prompt voice name in assistant message title when voiceId is provided", () => {
+  test("includes prompt voice name in metadata when voiceId is provided", () => {
     const messages: Message[] = [
       {
         id: "assistant-1",
         role: "assistant",
         text: "Test response",
         voiceId: "visual_mapper",
+        responseTime: 1.5,
       },
     ];
 
@@ -85,22 +86,25 @@ describe("renderMessages", () => {
     const bubble = main.querySelector("div > div");
     expect(bubble).toBeDefined();
     
-    // Check that the voice label appears in the rendered content
+    // Check that the voice label appears in the metadata
     const voiceLabel = PROMPT_VOICES.find(v => v.id === "visual_mapper")?.label;
     expect(voiceLabel).toBe("Visual Mapper");
     
-    // The voice should appear in the markdown-rendered content
+    // The voice should appear in the metadata, not in the title
     const html = main.innerHTML;
     expect(html).toContain("Visual Mapper");
+    // Should not appear as a heading in the content
+    expect(html).not.toContain("## Summary (Visual Mapper)");
   });
 
-  test("includes prompt voice name for default voice", () => {
+  test("includes prompt voice name in metadata for default voice", () => {
     const messages: Message[] = [
       {
         id: "assistant-1",
         role: "assistant",
         text: "Test response",
         voiceId: "default",
+        responseTime: 1.5,
       },
     ];
 
@@ -110,6 +114,8 @@ describe("renderMessages", () => {
     const voiceLabel = PROMPT_VOICES.find(v => v.id === "default")?.label;
     expect(voiceLabel).toBe("Default");
     expect(html).toContain("Default");
+    // Should not appear as a heading
+    expect(html).not.toContain("## Summary (Default)");
   });
 
   test("handles missing voiceId gracefully", () => {
