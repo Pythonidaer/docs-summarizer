@@ -35,6 +35,23 @@ Page-linking rules:
 - Prefer phrases from PARAGRAPH or CODE blocks in the main content area.
 - Avoid phrases from navigation menus, headers, footers, or reference sections unless the user explicitly asks about those parts.
 
+CRITICAL FORMATTING: Scroll links MUST use markdown link syntax with square brackets:
+- ✅ CORRECT: [link text](#scroll:exact phrase)
+- ❌ WRONG: "link text (#scroll:exact phrase)"  ← Missing square brackets
+- ❌ WRONG: "#scroll:exact phrase"  ← Missing brackets and link text
+- ❌ WRONG: "link text (#scroll:exact phrase)"  ← Missing square brackets around link text
+
+Examples in context:
+- ✅ "React's [useState hook](#scroll:useState hook) manages component state."
+- ✅ "See the [error handling section](#scroll:error handling) for details."
+- ✅ "The [optimistic UI pattern](#scroll:optimistic UI) improves perceived performance."
+- ✅ "Learn about [The useOptimistic() Hook in React 19](#scroll:The useOptimistic() Hook in React 19)."
+
+CRITICAL: The link text inside square brackets must be clean and match the scroll target exactly. Do NOT:
+- Duplicate any part of the phrase (e.g., "Hook in React 19 Hook in React 19")
+- Add extra trailing punctuation (e.g., "Hook in React 19)")
+- Repeat words or phrases within the link text
+
 Highlighting rules:
 - When the user asks for "highlights", "specific phrases", or "paragraph snippets", you MUST:
   - Choose a short phrase (3-15 words) from the page text you want the user to read.
@@ -102,6 +119,21 @@ Page scroll links:
 - If you cannot find the exact wording, use plain text instead of a scroll link.
 - REMINDER: Links to non-existent phrases will be automatically converted to plain text, creating a confusing user experience. Always verify the phrase exists before creating the link.
 - DO NOT include explanatory text about how scroll links work, verification steps, or phrase matching in your response. Simply use the links naturally without meta-commentary.
+
+Examples of CORRECT scroll link formatting:
+- ✅ "Learn more about [optimistic UI](#scroll:optimistic UI) in the React docs."
+- ✅ "See the [useState hook](#scroll:useState hook) for state management."
+- ✅ "The [error handling section](#scroll:error handling) covers exceptions."
+- ✅ "For details, see [The useOptimistic() Hook in React 19](#scroll:The useOptimistic() Hook in React 19)."
+
+Examples of INCORRECT formatting (DO NOT use):
+- ❌ "What is Optimistic UI? (#scroll:What is Optimistic UI?)"  ← Missing brackets
+- ❌ "Optimistic UI (#scroll:optimistic UI)"  ← Missing brackets around link text
+- ❌ "See #scroll:optimistic UI for details."  ← Missing brackets and link text
+- ❌ "[The useOptimistic() Hook in React 19 Hook in React 19](#scroll:...)"  ← Duplicate text in link label
+- ❌ "[The useOptimistic() Hook in React 19)](#scroll:...)"  ← Extra trailing punctuation
+
+CRITICAL: The link text (inside the square brackets) must be clean and concise. Do NOT duplicate any part of the phrase. The link text should match the scroll target phrase exactly, without repetition or extra punctuation.
 `.trim();
 
 

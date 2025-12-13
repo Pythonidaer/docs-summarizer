@@ -231,6 +231,43 @@ describe("renderInlineMarkdown", () => {
     // The link should contain the text including the asterisks
     expect(link!.textContent).toContain("bold");
   });
+
+  test("removes duplicate phrases from link labels", () => {
+    setPageTextForLinks("The useOptimistic() Hook in React 19 is a new feature.");
+    const input = "[The useOptimistic() Hook in React 19 Hook in React 19](#scroll:The useOptimistic() Hook in React 19)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    // Should remove the duplicate "Hook in React 19"
+    expect(link!.textContent).toBe("The useOptimistic() Hook in React 19");
+    expect(link!.textContent).not.toContain("Hook in React 19 Hook in React 19");
+  });
+
+  test("removes duplicate phrases with trailing punctuation", () => {
+    setPageTextForLinks("The useOptimistic() Hook in React 19 is a new feature.");
+    const input = "[The useOptimistic() Hook in React 19 Hook in React 19)](#scroll:The useOptimistic() Hook in React 19)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    // Should remove the duplicate and the orphaned trailing )
+    expect(link!.textContent).toBe("The useOptimistic() Hook in React 19");
+    expect(link!.textContent).not.toContain("Hook in React 19 Hook in React 19");
+    expect(link!.textContent).not.toMatch(/Hook in React 19\)$/);
+  });
+
+  test("removes shorter duplicate sequences", () => {
+    setPageTextForLinks("to Be an Artist is a book about creativity.");
+    const input = "[to Be an Artist to Be an Artist](#scroll:to Be an Artist)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    // Should remove the duplicate "to Be an Artist"
+    expect(link!.textContent).toBe("to Be an Artist");
+    expect(link!.textContent).not.toContain("to Be an Artist to Be an Artist");
+  });
 });
 
 describe("renderMarkdownInto - block structure", () => {

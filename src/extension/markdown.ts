@@ -99,19 +99,28 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
       rawLabel.replace(/\s*\[scroll:[^\]]*\]\s*$/i, "").trim() || rawLabel;
     
     // Remove duplicate phrases (e.g., "to Be an Artist to Be an Artist" → "to Be an Artist")
+    // Also handles cases like "Hook in React 19 Hook in React 19)" → "Hook in React 19"
     // This handles cases where the model accidentally duplicates part of the phrase
     const words = label.split(/\s+/);
     if (words.length > 2) {
-      // Check for duplicate sequences of 3+ words
-      for (let i = 0; i < words.length - 3; i++) {
-        const sequence = words.slice(i, i + 3).join(" ");
-        // Look for this sequence appearing again later
-        for (let j = i + 3; j <= words.length - 3; j++) {
-          const laterSequence = words.slice(j, j + 3).join(" ");
-          if (sequence.toLowerCase() === laterSequence.toLowerCase()) {
-            // Found duplicate - remove the later occurrence
-            words.splice(j, 3);
-            j -= 3; // Adjust index after removal
+      // Normalize words by removing trailing punctuation for comparison (but keep original for display)
+      const normalizedWords = words.map(w => w.replace(/[)\]"'`]+$/, "").toLowerCase());
+      
+      // Check for duplicate sequences of 2-5 words (more flexible than just 3)
+      // Start with longer sequences first to catch bigger duplicates
+      for (let seqLength = 5; seqLength >= 2; seqLength--) {
+        for (let i = 0; i <= normalizedWords.length - seqLength; i++) {
+          const sequence = normalizedWords.slice(i, i + seqLength).join(" ");
+          // Look for this sequence appearing again later
+          for (let j = i + seqLength; j <= normalizedWords.length - seqLength; j++) {
+            const laterSequence = normalizedWords.slice(j, j + seqLength).join(" ");
+            if (sequence === laterSequence) {
+              // Found duplicate - remove the later occurrence (both normalized and original)
+              normalizedWords.splice(j, seqLength);
+              words.splice(j, seqLength);
+              // Continue checking from the same position since we removed items
+              j--;
+            }
           }
         }
       }
@@ -121,6 +130,11 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
     // Clean up trailing punctuation that might be duplicated (e.g., "SS))" → "SS)")
     // Remove duplicate closing parentheses, brackets, or quotes at the end
     label = label.replace(/([)\]"'`])\1+$/, "$1");
+    
+    // Additional cleanup: remove orphaned trailing punctuation that might be left after duplicate removal
+    // e.g., "Hook in React 19)" → "Hook in React 19" (if the ) was part of a duplicate)
+    // This is a heuristic: if we have a single trailing punctuation after a space, it might be leftover
+    label = label.replace(/\s+([)\]"'`])$/, "");
 
     const HASH_PREFIX = "#scroll:";
     const PLAIN_PREFIX = "scroll:";
