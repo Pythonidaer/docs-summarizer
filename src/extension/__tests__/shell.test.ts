@@ -42,17 +42,19 @@ describe("createDrawerShell", () => {
     expect(handle.textContent).toBe("");
     const svg = handle.querySelector("svg");
     expect(svg).not.toBeNull();
-    // SVG should be bigger
-    expect(svg?.getAttribute("width")).toBe("20");
-    expect(svg?.getAttribute("height")).toBe("20");
+    // SVG size is now controlled via CSS for smooth transitions
+    // Check CSS style instead of attributes
+    expect(svg?.style.width).toBe("16px"); // Larger for primary affordance
+    expect(svg?.style.height).toBe("16px");
+    expect(svg?.style.transform).toBe("translateX(4px)"); // Nudged right for visual centering
     expect(handle.style.position).toBe("fixed");
     expect(handle.style.top).toBe("50%");
     expect(handle.style.right).toBe("0px"); // Browser normalizes to "0px"
-    // Should be cubic shape (equal width and height), bigger
-    expect(handle.style.width).toBe("32px");
-    expect(handle.style.height).toBe("32px");
+    // Should be oval/half-circle shape (thin initially, expands on hover)
+    expect(handle.style.width).toBe("28px"); // Initially wider to ensure perfect half-circle (not flat)
+    expect(handle.style.height).toBe("60px"); // Taller than wide (oval)
     expect(handle.style.padding).toBe("0px"); // No padding, fixed dimensions
-    expect(handle.style.borderRadius).toBe("4px 0 0 4px"); // Rounded corners only on left side (browser normalizes 0px to 0)
+    expect(handle.style.borderRadius).toBe("999px 0 0 999px"); // Perfect half-circle on left (very large radius ensures perfect semicircle)
     expect(handle.style.clipPath === "" || handle.style.clipPath === "none" || !handle.style.clipPath).toBe(true); // No clip-path
     // Arrow should be centered
     expect(handle.style.justifyContent).toBe("center");

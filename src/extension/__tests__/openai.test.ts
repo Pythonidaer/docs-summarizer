@@ -180,6 +180,92 @@ describe("buildInputForConversation", () => {
     // We no longer show "(No prior conversation.)"
     expect(result).not.toContain("(No prior conversation.)");
   });
+
+  it("strips scroll links from assistant messages in history", () => {
+    const pageText = "Some documentation.";
+    const history: Message[] = [
+      { id: "1", role: "user", text: "What is type inference?" },
+      { 
+        id: "2", 
+        role: "assistant", 
+        text: "Type inference is explained in the [Type inference section](#scroll:Type inference section)." 
+      },
+    ];
+
+    const result = buildInputForConversation(pageText, history);
+
+    // User message should be unchanged
+    expect(result).toContain("User: What is type inference?");
+
+    // Assistant message should have scroll link stripped (just the label text remains)
+    expect(result).toContain("Assistant: Type inference is explained in the Type inference section.");
+    
+    // The assistant message line should NOT contain the scroll link syntax
+    // (Note: MARKDOWN_FORMAT_HINT contains "#scroll:" examples, so we check the specific line)
+    const assistantLine = result.split("\n").find(line => line.startsWith("Assistant:"));
+    expect(assistantLine).toBeDefined();
+    expect(assistantLine).not.toContain("#scroll:");
+    expect(assistantLine).not.toContain("scroll:");
+  });
+
+  it("strips multiple scroll links from assistant messages", () => {
+    const pageText = "Some documentation.";
+    const history: Message[] = [
+      { 
+        id: "1", 
+        role: "assistant", 
+        text: "See [Type inference](#scroll:Type inference) and [Function types](#scroll:Function types) for details." 
+      },
+    ];
+
+    const result = buildInputForConversation(pageText, history);
+
+    // Both links should be stripped, leaving just the label text
+    expect(result).toContain("Assistant: See Type inference and Function types for details.");
+    
+    // The assistant message line should NOT contain the scroll link syntax
+    const assistantLine = result.split("\n").find(line => line.startsWith("Assistant:"));
+    expect(assistantLine).toBeDefined();
+    expect(assistantLine).not.toContain("#scroll:");
+  });
+
+  it("preserves user messages with scroll links (does not strip them)", () => {
+    const pageText = "Some documentation.";
+    const history: Message[] = [
+      { 
+        id: "1", 
+        role: "user", 
+        text: "Can you explain [this section](#scroll:this section)?" 
+      },
+    ];
+
+    const result = buildInputForConversation(pageText, history);
+
+    // User messages should be unchanged (they might reference things)
+    expect(result).toContain("User: Can you explain [this section](#scroll:this section)?");
+  });
+
+  it("handles both #scroll: and scroll: patterns", () => {
+    const pageText = "Some documentation.";
+    const history: Message[] = [
+      { 
+        id: "1", 
+        role: "assistant", 
+        text: "See [Hash link](#scroll:phrase) and [Plain link](scroll:phrase)." 
+      },
+    ];
+
+    const result = buildInputForConversation(pageText, history);
+
+    // Both patterns should be stripped
+    expect(result).toContain("Assistant: See Hash link and Plain link.");
+    
+    // The assistant message line should NOT contain the scroll link syntax
+    const assistantLine = result.split("\n").find(line => line.startsWith("Assistant:"));
+    expect(assistantLine).toBeDefined();
+    expect(assistantLine).not.toContain("#scroll:");
+    expect(assistantLine).not.toContain("scroll:");
+  });
 });
 
 describe("callOpenAI", () => {

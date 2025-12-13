@@ -38,6 +38,8 @@ Use analogies to familiar ideas when helpful.
 Stay at a high level unless the user requests deeper detail.
 Prefer clear structure, short paragraphs, and concrete examples.
 Highlight 1–3 core takeaways that define the topic.
+
+When including scroll links to page sections, simply list them naturally without explanatory text about how they work or verification steps. For example, use a heading like "Quick references" or "Related sections" followed by the links—do not include notes about phrase matching or link functionality.
 `.trim(),
   },
   {
@@ -130,6 +132,17 @@ Organize the answer into clear sections with headings or strong paragraph breaks
 Do not worry about being brief; assume the reader wants a full deep dive.
 Include edge cases, implementation details, and technical nuances.
 Explain both the "what" and the "why" in depth.
+
+Citation format:
+- When referencing content from the page, use numbered citations in square brackets: [1], [2], [3], etc.
+- Place citation numbers immediately after the referenced claim or phrase, not at the end of paragraphs.
+- Each unique page section should get its own citation number. You may reuse the same citation number multiple times if referencing the same section.
+- At the end of your response, include a single "References" section listing each unique citation number exactly once.
+- Each reference entry should be formatted as: [1] [link text](#scroll:target phrase)
+- DO NOT duplicate the link text before the link (e.g., avoid "link text link text" - only include the link).
+- DO NOT create duplicate reference sections or include plain text references without links.
+- DO NOT add inline scroll links at the end of paragraphs—use citation numbers instead.
+- CRITICAL: Every citation number used in the text [1], [2], etc. MUST have a corresponding entry in the References section. If you use [1] through [19], you must have reference entries [1] through [19].
 `.trim(),
   },
 
@@ -145,7 +158,7 @@ Write in a formal, academic tone similar to an MLA-style essay.
 
 Structure:
 - Start with an **Introduction** that states the main thesis or claim.
-- Follow with **Body** paragraphs that each develop one supporting idea.
+- Follow with body paragraphs that each develop one supporting idea.
 - End with a **Conclusion** that restates the thesis and synthesizes key points.
 
 Guidelines:
@@ -153,6 +166,8 @@ Guidelines:
 - Avoid slang; keep the style precise and formal.
 - When appropriate, reference ideas as if citing sources (e.g., "According to the documentation…"), but do not fabricate specific citation formats unless the user asks.
 - Paragraphs may be longer (3–5 sentences) to develop ideas fully.
+- DO NOT label paragraphs as "Body Paragraph 1", "Body Paragraph 2", etc. Simply write the paragraphs naturally without numbering or explicit labels.
+- Use section headings only when they add clarity (e.g., "Introduction", "Conclusion"), not for every body paragraph.
 `.trim(),
   },
   {

@@ -41,13 +41,16 @@ describe("createHeader", () => {
     expect(closeButton.textContent).toBe("×");
     // Border may be "none" or empty string depending on browser normalization
     expect(closeButton.style.border === "none" || closeButton.style.border === "").toBe(true);
-    expect(closeButton.style.background).toBe("transparent");
+    // Close button now has circular background (always visible)
+    expect(closeButton.style.background).toBe("rgb(60, 60, 60)"); // CURSOR_COLORS.buttonSecondary
     expect(closeButton.style.color).toBe("rgb(204, 204, 204)"); // CURSOR_COLORS.textPrimary
     expect(closeButton.style.cursor).toBe("pointer");
     expect(closeButton.style.fontSize).toBe("18px");
     expect(closeButton.style.marginLeft).toBe("auto");
-    expect(closeButton.style.padding).toBe("4px 8px"); // Cubic padding (4px vertical, 8px horizontal)
-    expect(closeButton.style.borderRadius).toBe("4px"); // Rounded corners
+    expect(closeButton.style.width).toBe("24px"); // Circular button (fixed width)
+    expect(closeButton.style.height).toBe("24px"); // Circular button (fixed height)
+    expect(closeButton.style.padding).toBe("0px"); // No padding, fixed dimensions
+    expect(closeButton.style.borderRadius).toBe("50%"); // Perfect circle
     expect(closeButton.style.transition).toBe("background-color 0.2s");
   });
 

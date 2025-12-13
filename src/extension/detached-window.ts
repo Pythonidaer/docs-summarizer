@@ -6,13 +6,14 @@ import { createHeader } from "./ui/header";
 import { createFooter } from "./ui/footer";
 import { createToolbar } from "./ui/toolbar";
 import { createMainArea } from "./ui/mainArea";
-import { DRAWER_STYLE_CSS } from "./ui/styles";
+import { DRAWER_STYLE_CSS, LOADING_ANIMATION_CSS, MODAL_ANIMATION_CSS } from "./ui/styles";
 import { setPageTextForLinks } from "./pageText";
 import type { PromptVoiceId } from "./prompts/voices";
 import { wireDrawerEvents } from "./ui/events";
 import { chatWithOpenAI, summarizeWithOpenAI } from "./openai";
 import { renderMessages } from "./ui/messages";
 import { DEFAULT_MODEL_SETTINGS } from "./constants";
+import { showAlert } from "./ui/modal";
 
 // Global state
 let messages: Message[] = [];
@@ -75,7 +76,7 @@ function initializeUI(): void {
 
   // Inject styles
   const style = document.createElement("style");
-  style.textContent = DRAWER_STYLE_CSS;
+  style.textContent = DRAWER_STYLE_CSS + LOADING_ANIMATION_CSS + MODAL_ANIMATION_CSS;
   document.head.appendChild(style);
 
   // Create container (similar to drawer content but without shadow DOM)
@@ -121,6 +122,9 @@ function initializeUI(): void {
 
   // Hide new window button in detached window (can't detach from detached window)
   newWindowBtn.style.display = "none";
+
+  // Hide clear highlights button in detached window (doesn't work in detached window)
+  clearHighlightsBtn.style.display = "none";
 
   // Hide blur checkbox in detached window
   if (blurCheckbox.parentElement) {
@@ -173,12 +177,8 @@ function initializeUI(): void {
     updateState();
   });
 
-  // Clear highlights button (disabled in detached window, but show message)
-  clearHighlightsBtn.addEventListener("click", () => {
-    alert(
-      "Clear highlights is only available in the main window. Please use the main window to clear highlights."
-    );
-  });
+  // Clear highlights button is hidden in detached window (see above)
+  // No event listener needed since button is hidden
 
   // Assemble UI
   container.appendChild(style);

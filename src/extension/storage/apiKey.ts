@@ -1,3 +1,4 @@
+import { showPrompt, showAlert } from "../ui/modal";
 
 // ------------ API key storage helpers --------------
 
@@ -21,9 +22,13 @@ export async function ensureApiKey(): Promise<string | null> {
     const existing = await getApiKey();
     if (existing) return existing;
 
-    const entered = window.prompt("Enter your OpenAI API key (will be stored in Chrome for this extension only):");
+    const entered = await showPrompt(
+        "Enter your OpenAI API key (will be stored in Chrome for this extension only):",
+        "sk-..."
+    );
+    
     if (!entered || !entered.trim()) {
-        alert("No API key entered. Cannot call OpenAI.");
+        await showAlert("No API key entered. Cannot call OpenAI.", "API Key Required");
         return null;
     }
 

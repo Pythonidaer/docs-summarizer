@@ -1,6 +1,17 @@
 /** @jest-environment jsdom */
 import { ensureApiKey } from "../storage/apiKey";
 
+// Mock modal functions
+jest.mock("../ui/modal", () => ({
+  showPrompt: jest.fn(),
+  showAlert: jest.fn(),
+}));
+
+import { showPrompt, showAlert } from "../ui/modal";
+
+const mockShowPrompt = showPrompt as jest.MockedFunction<typeof showPrompt>;
+const mockShowAlert = showAlert as jest.MockedFunction<typeof showAlert>;
+
 // Mock chrome.storage.sync
 const mockStorage: { [key: string]: any } = {};
 
@@ -36,14 +47,8 @@ const mockChromeStorage = {
   },
 };
 
-// Mock window.prompt and window.alert
-const mockPrompt = jest.fn();
-const mockAlert = jest.fn();
-
 beforeAll(() => {
   (global as any).chrome = { storage: mockChromeStorage };
-  (global as any).window.prompt = mockPrompt;
-  (global as any).window.alert = mockAlert;
 });
 
 beforeEach(() => {
@@ -53,8 +58,8 @@ beforeEach(() => {
   for (const key in mockStorage) {
     delete mockStorage[key];
   }
-  mockPrompt.mockReturnValue(null);
-  mockAlert.mockClear();
+  mockShowPrompt.mockResolvedValue(null);
+  mockShowAlert.mockResolvedValue(undefined);
   
   // Reset the get mock to read from current mockStorage
   mockChromeStorage.sync.get.mockImplementation((keys: string[] | { [key: string]: any }, callback: (result: any) => void) => {
@@ -88,18 +93,19 @@ describe("ensureApiKey", () => {
 
     expect(result).toBe("sk-test123");
     expect(mockChromeStorage.sync.get).toHaveBeenCalled();
-    expect(mockPrompt).not.toHaveBeenCalled();
+    expect(mockShowPrompt).not.toHaveBeenCalled();
   });
 
   test("prompts user when key is missing", async () => {
     mockStorage.openaiApiKey = undefined;
-    mockPrompt.mockReturnValue("sk-user-entered-key");
+    mockShowPrompt.mockResolvedValue("sk-user-entered-key");
 
     const result = await ensureApiKey();
 
     expect(result).toBe("sk-user-entered-key");
-    expect(mockPrompt).toHaveBeenCalledWith(
-      "Enter your OpenAI API key (will be stored in Chrome for this extension only):"
+    expect(mockShowPrompt).toHaveBeenCalledWith(
+      "Enter your OpenAI API key (will be stored in Chrome for this extension only):",
+      "sk-..."
     );
     expect(mockChromeStorage.sync.set).toHaveBeenCalledWith(
       { openaiApiKey: "sk-user-entered-key" },
@@ -109,40 +115,40 @@ describe("ensureApiKey", () => {
 
   test("returns null when user cancels prompt", async () => {
     mockStorage.openaiApiKey = undefined;
-    mockPrompt.mockReturnValue(null);
+    mockShowPrompt.mockResolvedValue(null);
 
     const result = await ensureApiKey();
 
     expect(result).toBeNull();
-    expect(mockAlert).toHaveBeenCalledWith("No API key entered. Cannot call OpenAI.");
+    expect(mockShowAlert).toHaveBeenCalledWith("No API key entered. Cannot call OpenAI.", "API Key Required");
     expect(mockChromeStorage.sync.set).not.toHaveBeenCalled();
   });
 
   test("returns null when user enters empty string", async () => {
     mockStorage.openaiApiKey = undefined;
-    mockPrompt.mockReturnValue("");
+    mockShowPrompt.mockResolvedValue("");
 
     const result = await ensureApiKey();
 
     expect(result).toBeNull();
-    expect(mockAlert).toHaveBeenCalledWith("No API key entered. Cannot call OpenAI.");
+    expect(mockShowAlert).toHaveBeenCalledWith("No API key entered. Cannot call OpenAI.", "API Key Required");
     expect(mockChromeStorage.sync.set).not.toHaveBeenCalled();
   });
 
   test("returns null when user enters only whitespace", async () => {
     mockStorage.openaiApiKey = undefined;
-    mockPrompt.mockReturnValue("   \n  ");
+    mockShowPrompt.mockResolvedValue("   \n  ");
 
     const result = await ensureApiKey();
 
     expect(result).toBeNull();
-    expect(mockAlert).toHaveBeenCalledWith("No API key entered. Cannot call OpenAI.");
+    expect(mockShowAlert).toHaveBeenCalledWith("No API key entered. Cannot call OpenAI.", "API Key Required");
     expect(mockChromeStorage.sync.set).not.toHaveBeenCalled();
   });
 
   test("trims and stores the entered key", async () => {
     mockStorage.openaiApiKey = undefined;
-    mockPrompt.mockReturnValue("  sk-test-key-with-spaces  ");
+    mockShowPrompt.mockResolvedValue("  sk-test-key-with-spaces  ");
 
     const result = await ensureApiKey();
 
@@ -182,23 +188,23 @@ describe("ensureApiKey", () => {
       callback({ openaiApiKey: undefined });
     });
 
-    mockPrompt.mockReturnValue("sk-new-key");
+    mockShowPrompt.mockResolvedValue("sk-new-key");
 
     const result = await ensureApiKey();
 
     expect(result).toBe("sk-new-key");
-    expect(mockPrompt).toHaveBeenCalled();
+    expect(mockShowPrompt).toHaveBeenCalled();
   });
 
   test("does not prompt again after storing key", async () => {
     // Clear storage first
     delete mockStorage.openaiApiKey;
-    mockPrompt.mockReturnValue("sk-first-call");
+    mockShowPrompt.mockResolvedValue("sk-first-call");
 
     // First call - should prompt
     const firstResult = await ensureApiKey();
     expect(firstResult).toBe("sk-first-call");
-    expect(mockPrompt).toHaveBeenCalledTimes(1);
+    expect(mockShowPrompt).toHaveBeenCalledTimes(1);
     
     // Verify key was stored in mockStorage (check directly)
     expect(mockStorage.openaiApiKey).toBe("sk-first-call");
@@ -220,13 +226,13 @@ describe("ensureApiKey", () => {
     expect(testResult.openaiApiKey).toBe("sk-first-call");
 
     // Reset prompt mock to detect if it's called again
-    mockPrompt.mockClear();
-    mockPrompt.mockReturnValue(null); // Change return value to detect if called
+    mockShowPrompt.mockClear();
+    mockShowPrompt.mockResolvedValue(null); // Change return value to detect if called
 
     // Second call - should use stored key, no prompt
     const secondResult = await ensureApiKey();
     expect(secondResult).toBe("sk-first-call");
-    expect(mockPrompt).not.toHaveBeenCalled(); // Should not prompt again
+    expect(mockShowPrompt).not.toHaveBeenCalled(); // Should not prompt again
   });
 });
 

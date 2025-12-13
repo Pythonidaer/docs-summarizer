@@ -41,7 +41,7 @@ describe("renderMessages", () => {
     expect(userRow).toBeDefined();
     if (userRow) {
       const bubble = userRow.querySelector("div");
-      expect(bubble?.style.background).toBe("rgb(37, 99, 235)"); // #2563eb
+      expect(bubble?.style.background).toBe("rgb(74, 85, 104)"); // #4a5568 (muted grey/blue)
       expect(bubble?.textContent).toBe("Test question");
     }
   });
@@ -134,6 +134,132 @@ describe("renderMessages", () => {
     expect(bubble).toBeDefined();
     // Should still render without error
     expect(bubble?.textContent || bubble?.innerHTML).toContain("Test response");
+  });
+
+  test("renders loading indicator for assistant message with loading flag", () => {
+    const messages: Message[] = [
+      {
+        id: "loading-1",
+        role: "assistant",
+        text: "",
+        loading: true,
+      },
+    ];
+
+    renderMessages(main, messages);
+
+    const rows = main.querySelectorAll("div");
+    expect(rows.length).toBeGreaterThan(0);
+    
+    const assistantRow = Array.from(rows).find((row) => {
+      const bubble = row.querySelector("div");
+      // Loading messages have transparent background
+      return bubble && (bubble.style.background === "transparent" || bubble.style.background === "rgba(0, 0, 0, 0)");
+    });
+    
+    expect(assistantRow).toBeDefined();
+    if (assistantRow) {
+      const bubble = assistantRow.querySelector("div");
+      expect(bubble).toBeDefined();
+      
+      // Should have transparent background
+      expect(bubble?.style.background === "transparent" || bubble?.style.background === "rgba(0, 0, 0, 0)").toBe(true);
+      
+      // Should contain loading indicator (three pulsing circles)
+      const loadingIndicator = bubble?.querySelector(".docs-summarizer-loading");
+      expect(loadingIndicator).toBeDefined();
+      
+      // Should have three circles
+      const circles = loadingIndicator?.querySelectorAll(".docs-summarizer-loading-dot");
+      expect(circles?.length).toBe(3);
+    }
+  });
+
+  test("loading indicator appears on left side (assistant side)", () => {
+    const messages: Message[] = [
+      {
+        id: "loading-1",
+        role: "assistant",
+        text: "",
+        loading: true,
+      },
+    ];
+
+    renderMessages(main, messages);
+
+    const rows = main.querySelectorAll("div");
+    const assistantRow = Array.from(rows).find((row) => {
+      return row.style.justifyContent === "flex-start"; // Left-aligned
+    });
+    
+    expect(assistantRow).toBeDefined();
+  });
+
+  test("loading indicator has correct styling", () => {
+    const messages: Message[] = [
+      {
+        id: "loading-1",
+        role: "assistant",
+        text: "",
+        loading: true,
+      },
+    ];
+
+    renderMessages(main, messages);
+
+    const loadingIndicator = main.querySelector(".docs-summarizer-loading");
+    expect(loadingIndicator).toBeDefined();
+    
+    // Check that it has display flex
+    expect((loadingIndicator as HTMLElement)?.style.display).toBe("flex");
+    
+    // Check circles have animation
+    const circles = loadingIndicator?.querySelectorAll(".docs-summarizer-loading-dot");
+    circles?.forEach((circle, index) => {
+      const circleEl = circle as HTMLElement;
+      expect(circleEl.style.animation).toContain("pulse");
+      // Each circle should have a delay for sequential animation
+      if (index > 0) {
+        expect(circleEl.style.animationDelay).toBeTruthy();
+      }
+    });
+  });
+
+  test("does not show loading indicator for non-loading messages", () => {
+    const messages: Message[] = [
+      {
+        id: "assistant-1",
+        role: "assistant",
+        text: "Normal response",
+        loading: false, // Explicitly not loading
+      },
+    ];
+
+    renderMessages(main, messages);
+
+    const loadingIndicator = main.querySelector(".docs-summarizer-loading");
+    expect(loadingIndicator).toBeNull();
+    
+    // Should show normal text instead
+    expect(main.textContent).toContain("Normal response");
+  });
+
+  test("loading indicator does not show metadata", () => {
+    const messages: Message[] = [
+      {
+        id: "loading-1",
+        role: "assistant",
+        text: "",
+        loading: true,
+        responseTime: 1.5, // Even if metadata exists, shouldn't show for loading
+      },
+    ];
+
+    renderMessages(main, messages);
+
+    // Should not have metadata container
+    const metadataContainer = main.querySelector('[style*="position: absolute"]');
+    expect(metadataContainer).toBeNull();
   });
 });
 

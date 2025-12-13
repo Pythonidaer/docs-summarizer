@@ -16,9 +16,10 @@ import { createHeader } from "./ui/header";
 import { createFooter } from "./ui/footer";
 import { createToolbar } from "./ui/toolbar";
 import { createMainArea } from "./ui/mainArea";
-import { DRAWER_STYLE_CSS, GLOBAL_HIGHLIGHT_STYLE_CSS } from "./ui/styles";
+import { DRAWER_STYLE_CSS, GLOBAL_HIGHLIGHT_STYLE_CSS, LOADING_ANIMATION_CSS, MODAL_ANIMATION_CSS } from "./ui/styles";
 import { setPageTextForLinks } from "./pageText";
 import { clearAllHighlights, scrollToPageMatch } from "./highlight";
+import { showAlert } from "./ui/modal";
 import type { PromptVoiceId } from "./prompts/voices";
 import { wireDrawerEvents } from "./ui/events";
 import {
@@ -85,9 +86,10 @@ export function setDrawerOpen(
   }
   
   // Update arrow SVG direction and tooltip
+  // Arrow is already centered via flexbox (handle has display: flex, alignItems: center, justifyContent: center)
   const arrowSvg = handle.querySelector("svg");
   const arrowPath = arrowSvg?.querySelector("path");
-  if (arrowPath) {
+  if (arrowSvg && arrowPath) {
     if (isOpen) {
       // Right arrow (drawer is open, arrow points right to close)
       arrowPath.setAttribute("d", "M5 12h14M12 5l7 7-7 7");
@@ -106,19 +108,57 @@ export function setDrawerOpen(
   }
 }
 
-/* Main entry: builds the drawer UI and wires events.*/
-function createDrawerUI(): void {
-  // Don't inject drawer on the detached window page itself (prevents recursive injection)
-  if (typeof window !== "undefined" && window.location) {
-    const url = window.location.href.toLowerCase();
-    if (url.includes("detached-window.html")) {
-      console.log("[Docs Summarizer] Skipping drawer injection on detached window page");
-      return;
+/**
+ * Checks if the page is ready for drawer injection.
+ * Returns true if body exists and has meaningful content.
+ */
+function isPageReadyForInjection(): boolean {
+  // Don't inject on detached window page
+  try {
+    if (typeof window !== "undefined" && window.location) {
+      const url = (window.location.href || "").toLowerCase();
+      if (url.includes("detached-window.html")) {
+        return false;
+      }
     }
+  } catch (e) {
+    // Some environments (like JSDOM) may throw when accessing location.href
+    // In that case, continue with other checks
   }
 
-  // Avoid creating multiple drawers if script runs twice
-  if (document.getElementById(DRAWER_ROOT_ID)) return;
+  // Check if drawer already exists
+  if (document.getElementById(DRAWER_ROOT_ID)) {
+    return false;
+  }
+
+  // Check if body exists and has content
+  const body = document.body;
+  if (!body) {
+    return false;
+  }
+
+  // Check if body has meaningful content (not just empty or whitespace)
+  // Look for elements that indicate real content - be more lenient for SPAs
+  const hasContent = 
+    body.children.length > 0 || 
+    body.textContent?.trim().length > 0 ||
+    body.querySelector("main, article, [role='main'], div, section") !== null ||
+    // Also check for common SPA patterns
+    body.querySelector("[data-reactroot], [data-v-app], #app, #root, [ng-app]") !== null ||
+    // Check if body has any non-script/style children
+    Array.from(body.children).some(child => 
+      !['SCRIPT', 'STYLE', 'NOSCRIPT', 'LINK', 'META'].includes(child.tagName)
+    );
+
+  return hasContent;
+}
+
+/* Main entry: builds the drawer UI and wires events.*/
+function createDrawerUI(): void {
+  // Check if page is ready
+  if (!isPageReadyForInjection()) {
+    return;
+  }
 
   // Inject blur CSS once (no blur active until user toggles)
   injectBlurStyles();
@@ -144,7 +184,7 @@ function createDrawerUI(): void {
 
   // Scoped styles (Shadow DOM)
   const style = document.createElement("style");
-  style.textContent = DRAWER_STYLE_CSS;
+  style.textContent = DRAWER_STYLE_CSS + LOADING_ANIMATION_CSS + MODAL_ANIMATION_CSS;
 
   // Header
   const { header, closeButton } = createHeader();
@@ -245,8 +285,9 @@ function createDrawerUI(): void {
             "[Docs Summarizer] Error opening detached window:",
             chrome.runtime.lastError
           );
-          alert(
-            `Failed to open detached window: ${chrome.runtime.lastError.message}`
+          void showAlert(
+            `Failed to open detached window: ${chrome.runtime.lastError.message}`,
+            "Error"
           );
         } else if (response && response.success !== false) {
           // Successfully opened detached window - close the drawer
@@ -293,15 +334,252 @@ function createDrawerUI(): void {
 // Listen for scroll/highlight requests from detached window
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "SCROLL_AND_HIGHLIGHT") {
-    scrollToPageMatch(message.phrase);
+    void scrollToPageMatch(message.phrase);
     sendResponse({ success: true });
   }
   return true;
 });
 
-// Run when content script loads
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", createDrawerUI);
-} else {
-  createDrawerUI();
+/**
+ * Attempts to create the drawer UI with retry logic.
+ * Uses exponential backoff and MutationObserver for dynamic content.
+ */
+function attemptDrawerInjection(): void {
+  if (isPageReadyForInjection()) {
+    createDrawerUI();
+    return;
+  }
+
+  // Retry with exponential backoff - more aggressive for SPAs
+  let attempt = 0;
+  const maxAttempts = 8; // Increased from 5 to 8
+  const baseDelay = 50; // Reduced from 100ms to 50ms for faster initial retry
+
+  const retry = () => {
+    attempt++;
+    
+    if (attempt > maxAttempts) {
+      console.warn("[Docs Summarizer] Failed to inject drawer after", maxAttempts, "attempts. Body state:", {
+        bodyExists: !!document.body,
+        bodyChildren: document.body?.children.length || 0,
+        bodyTextLength: document.body?.textContent?.trim().length || 0,
+        readyState: document.readyState,
+      });
+      return;
+    }
+
+    if (isPageReadyForInjection()) {
+      console.log("[Docs Summarizer] Successfully injected drawer on attempt", attempt);
+      createDrawerUI();
+      return;
+    }
+
+    // Exponential backoff: 50ms, 100ms, 200ms, 400ms, 800ms, 1600ms, 3200ms, 6400ms
+    const delay = baseDelay * Math.pow(2, attempt - 1);
+    setTimeout(retry, delay);
+  };
+
+  // Start first retry after initial delay
+  setTimeout(retry, baseDelay);
+}
+
+/**
+ * Sets up MutationObserver to watch for dynamic content changes.
+ * This helps with SPAs that load content asynchronously.
+ */
+function setupContentWatcher(): void {
+  // Only set up if drawer doesn't exist yet
+  if (document.getElementById(DRAWER_ROOT_ID)) {
+    return;
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    // Check if any mutations added meaningful content
+    let hasNewContent = false;
+    
+    for (const mutation of mutations) {
+      if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+        for (const node of Array.from(mutation.addedNodes)) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node as HTMLElement;
+            // Check if it's a meaningful element (not script, style, etc.)
+            if (
+              element.tagName !== "SCRIPT" &&
+              element.tagName !== "STYLE" &&
+              element.tagName !== "NOSCRIPT" &&
+              (element.textContent?.trim().length > 0 || element.children.length > 0)
+            ) {
+              hasNewContent = true;
+              break;
+            }
+          }
+        }
+        if (hasNewContent) break;
+      }
+    }
+
+    if (hasNewContent && isPageReadyForInjection()) {
+      createDrawerUI();
+      observer.disconnect(); // Stop observing once drawer is created
+    }
+  });
+
+  // Start observing body for child additions AND removals
+  if (document.body) {
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    // Also observe document for body changes (in case body gets replaced)
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: false, // Only watch direct children of html
+    });
+
+    // Don't disconnect - keep watching for drawer removal
+    // This is important for SPAs that might remove/replace the drawer during navigation
+  }
+}
+
+// Initialize drawer injection
+// Use multiple strategies to ensure injection works on SPAs
+function initializeDrawerInjection(): void {
+  // Wait for body to exist (document_end should have it, but be safe)
+  if (!document.body) {
+    // If body doesn't exist yet, wait for it
+    const bodyObserver = new MutationObserver(() => {
+      if (document.body) {
+        bodyObserver.disconnect();
+        console.log("[Docs Summarizer] Body now exists, initializing drawer injection. Ready state:", document.readyState);
+        attemptDrawerInjection();
+        setupContentWatcher();
+        setupDrawerWatcher(); // Watch for drawer removal
+      }
+    });
+    
+    // Watch document for body creation
+    bodyObserver.observe(document.documentElement, {
+      childList: true,
+    });
+    
+    // Fallback: try again after a short delay
+    setTimeout(() => {
+      if (document.body) {
+        bodyObserver.disconnect();
+        console.log("[Docs Summarizer] Body exists after delay, initializing drawer injection");
+        attemptDrawerInjection();
+        setupContentWatcher();
+        setupDrawerWatcher();
+      }
+    }, 100);
+    
+    return;
+  }
+  
+  console.log("[Docs Summarizer] Initializing drawer injection. Ready state:", document.readyState);
+  
+  attemptDrawerInjection();
+  setupContentWatcher();
+  setupDrawerWatcher(); // Watch for drawer removal
+  
+  // Also listen for DOMContentLoaded if page is still loading
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      console.log("[Docs Summarizer] DOMContentLoaded fired, re-attempting injection");
+      attemptDrawerInjection();
+    });
+  }
+  
+  // Listen for load event as well (for SPAs that finish loading later)
+  window.addEventListener("load", () => {
+    console.log("[Docs Summarizer] Window load event fired, checking drawer");
+    if (!document.getElementById(DRAWER_ROOT_ID)) {
+      console.log("[Docs Summarizer] Drawer missing after load, re-injecting");
+      attemptDrawerInjection();
+    }
+  });
+}
+
+/**
+ * Sets up a MutationObserver specifically to watch for drawer removal.
+ * This is critical for Next.js/React SPAs that might remove the drawer during hydration.
+ */
+function setupDrawerWatcher(): void {
+  // Only set up if drawer doesn't exist (to avoid duplicate watchers)
+  if (!document.body) {
+    return;
+  }
+  
+  let drawerWatcher: MutationObserver | null = null;
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+  
+  const checkAndReinject = () => {
+    // Only check if we don't already have a drawer
+    if (!document.getElementById(DRAWER_ROOT_ID) && document.body) {
+      console.log("[Docs Summarizer] Drawer was removed, re-injecting...");
+      attemptDrawerInjection();
+    }
+  };
+  
+  // Check periodically (but less frequently to avoid performance issues)
+  intervalId = setInterval(() => {
+    checkAndReinject();
+  }, 1000); // Check every 1 second
+  
+  try {
+    drawerWatcher = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === "childList") {
+          // Check if drawer was removed
+          for (const node of Array.from(mutation.removedNodes)) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as HTMLElement;
+              if (element.id === DRAWER_ROOT_ID || element.querySelector(`#${DRAWER_ROOT_ID}`)) {
+                console.log("[Docs Summarizer] Drawer removed via MutationObserver, re-injecting");
+                if (intervalId) clearInterval(intervalId);
+                attemptDrawerInjection();
+                return;
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    if (document.body) {
+      drawerWatcher.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    }
+  } catch (e) {
+    // If MutationObserver fails (e.g., in some test environments), just use interval
+    console.warn("[Docs Summarizer] MutationObserver setup failed, using interval only:", e);
+  }
+  
+  // Clean up after 60 seconds (to avoid memory leaks, but give enough time for SPAs)
+  setTimeout(() => {
+    if (intervalId) clearInterval(intervalId);
+    drawerWatcher?.disconnect();
+  }, 60000);
+}
+
+// Start initialization
+// In browser environment, this will run automatically
+if (typeof window !== "undefined") {
+  // Use requestAnimationFrame or setTimeout to ensure DOM is ready
+  if (document.body || document.readyState === "complete" || document.readyState === "interactive") {
+    initializeDrawerInjection();
+  } else {
+    // Wait for body to be available
+    const initWhenReady = () => {
+      if (document.body) {
+        initializeDrawerInjection();
+      } else {
+        setTimeout(initWhenReady, 10);
+      }
+    };
+    initWhenReady();
+  }
 }

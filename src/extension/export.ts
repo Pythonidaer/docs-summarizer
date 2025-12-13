@@ -233,12 +233,13 @@ export function exportMessageAsPDF(msg: Message): void {
         <style>
           @media print {
             @page {
-              margin: 1in;
+              margin: 0.5in;
             }
           }
           body {
-            margin: 0;
-            padding: 1in;
+            margin: 0 auto;
+            padding: 0.5in;
+            max-width: 8.5in;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             font-size: 12pt;
             line-height: 1.6;

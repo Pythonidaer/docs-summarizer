@@ -1,30 +1,126 @@
 import { scrollToPageMatch } from "./highlight";
+import { showAlert } from "./ui/modal";
 import { getPageTextForLinks } from "./pageText";
 
-// --- Inline markdown: links + scroll anchors ---------------------------------
+// --- Inline markdown: links + scroll anchors + bold text ---------------------
+
+interface InlineMarkdownMatch {
+  type: "link" | "bold";
+  start: number;
+  end: number;
+  content: string;
+  linkLabel?: string;
+  linkHref?: string;
+}
 
 function renderInlineMarkdown(container: HTMLElement, text: string): void {
+  const matches: InlineMarkdownMatch[] = [];
+
+  // Find all links: [label](url)
   const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let linkMatch: RegExpExecArray | null;
+  while ((linkMatch = linkRegex.exec(text)) !== null) {
+    matches.push({
+      type: "link",
+      start: linkMatch.index,
+      end: linkMatch.index + linkMatch[0].length,
+      content: linkMatch[0],
+      linkLabel: linkMatch[1] ?? "",
+      linkHref: linkMatch[2] ?? "",
+    });
+  }
+
+  // Find all bold text: **text** (but not inside links)
+  // Use a new regex instance to avoid state issues with global flag
+  const boldRegex = /\*\*([^*]+?)\*\*/g;
+  let boldMatch: RegExpExecArray | null;
+  // Reset regex lastIndex to ensure we start from the beginning
+  boldRegex.lastIndex = 0;
+  while ((boldMatch = boldRegex.exec(text)) !== null) {
+    const boldStart = boldMatch.index;
+    const boldEnd = boldStart + (boldMatch[0]?.length ?? 0);
+    
+    // Check if this bold text is inside a link
+    const isInsideLink = matches.some(
+      m => m.type === "link" && boldStart >= m.start && boldEnd <= m.end
+    );
+    
+    if (!isInsideLink && boldMatch[1]) {
+      matches.push({
+        type: "bold",
+        start: boldStart,
+        end: boldEnd,
+        content: boldMatch[1],
+      });
+    }
+  }
+
+  // Sort matches by start position
+  matches.sort((a, b) => a.start - b.start);
+
+  // Remove overlapping matches (prefer links over bold if they overlap)
+  const filteredMatches: InlineMarkdownMatch[] = [];
+  for (const match of matches) {
+    const overlaps = filteredMatches.some(
+      existing => 
+        (match.start < existing.end && match.end > existing.start)
+    );
+    if (!overlaps) {
+      filteredMatches.push(match);
+    }
+  }
+
+  // Render matches in order
   let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = linkRegex.exec(text)) !== null) {
-    const full = match[0];
-    const rawLabel = match[1] ?? "";
-    const href = match[2] ?? "";
-    const index = match.index;
-
-    // Text before the link
-    if (index > lastIndex) {
-      const before = text.slice(lastIndex, index);
+  for (const match of filteredMatches) {
+    // Text before the match
+    if (match.start > lastIndex) {
+      const before = text.slice(lastIndex, match.start);
       if (before) {
         container.appendChild(document.createTextNode(before));
       }
     }
 
+    // Render the match
+    if (match.type === "bold") {
+      const strong = document.createElement("strong");
+      strong.textContent = match.content;
+      strong.style.fontWeight = "600";
+      container.appendChild(strong);
+      lastIndex = match.end;
+    } else if (match.type === "link") {
+      // Handle link rendering (existing logic)
+      const rawLabel = match.linkLabel ?? "";
+      const href = match.linkHref ?? "";
+
     // Clean label, e.g. "Title [scroll:Something]" → "Title"
-    const label =
+    // Also remove duplicate text patterns that might occur from model errors
+    let label =
       rawLabel.replace(/\s*\[scroll:[^\]]*\]\s*$/i, "").trim() || rawLabel;
+    
+    // Remove duplicate phrases (e.g., "to Be an Artist to Be an Artist" → "to Be an Artist")
+    // This handles cases where the model accidentally duplicates part of the phrase
+    const words = label.split(/\s+/);
+    if (words.length > 2) {
+      // Check for duplicate sequences of 3+ words
+      for (let i = 0; i < words.length - 3; i++) {
+        const sequence = words.slice(i, i + 3).join(" ");
+        // Look for this sequence appearing again later
+        for (let j = i + 3; j <= words.length - 3; j++) {
+          const laterSequence = words.slice(j, j + 3).join(" ");
+          if (sequence.toLowerCase() === laterSequence.toLowerCase()) {
+            // Found duplicate - remove the later occurrence
+            words.splice(j, 3);
+            j -= 3; // Adjust index after removal
+          }
+        }
+      }
+      label = words.join(" ").trim();
+    }
+    
+    // Clean up trailing punctuation that might be duplicated (e.g., "SS))" → "SS)")
+    // Remove duplicate closing parentheses, brackets, or quotes at the end
+    label = label.replace(/([)\]"'`])\1+$/, "$1");
 
     const HASH_PREFIX = "#scroll:";
     const PLAIN_PREFIX = "scroll:";
@@ -61,6 +157,7 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
           container.appendChild(document.createTextNode(label));
         } else {
           // Normalize whitespace for comparison (collapse multiple spaces/newlines to single space)
+          // This handles &nbsp; entities and irregular spacing
           const normalizedPageText = pageTextForValidation
             .replace(/\s+/g, " ")
             .toLowerCase()
@@ -72,14 +169,22 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
           const ultraNormalizedPageText = normalizedPageText.replace(/\s/g, "");
           const ultraNormalizedTerm = normalizedTerm.replace(/\s/g, "");
 
+          // Also try matching with punctuation variations (e.g., "Night of the Long Knives" vs "Night of the Long Knives.")
+          const termWithoutTrailingPunct = normalizedTerm.replace(/[.,;:!?)\]]+$/, "");
+          const pageTextWithoutTrailingPunct = normalizedPageText.replace(/[.,;:!?)\]]+/g, "");
+
           const exactMatch = normalizedPageText.includes(normalizedTerm);
           const lenientMatch = ultraNormalizedPageText.includes(ultraNormalizedTerm);
+          const punctLenientMatch = termWithoutTrailingPunct && 
+            (pageTextWithoutTrailingPunct.includes(termWithoutTrailingPunct) ||
+             normalizedPageText.includes(termWithoutTrailingPunct));
 
-          if (!exactMatch && !lenientMatch) {
+          if (!exactMatch && !lenientMatch && !punctLenientMatch) {
             // Phrase doesn't exist - render as plain text instead of a link
             console.warn(
               "[Docs Summarizer] Scroll link phrase not found in page text, rendering as plain text:",
-              scrollTerm
+              scrollTerm,
+              "Tried:", normalizedTerm, "|", ultraNormalizedTerm, "|", termWithoutTrailingPunct
             );
             container.appendChild(document.createTextNode(label));
           } else {
@@ -114,15 +219,16 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
                 type: "SCROLL_TO_PHRASE",
                 phrase: termForClick,
               },
-              (response) => {
+              async (response) => {
                 if (chrome.runtime.lastError) {
                   console.error(
                     "[Docs Summarizer] Error sending scroll request:",
                     chrome.runtime.lastError
                   );
-                  alert(
+                  await showAlert(
                     `Could not scroll to phrase: ${chrome.runtime.lastError.message}\n\n` +
-                    "The main page may have been refreshed or closed."
+                    "The main page may have been refreshed or closed.",
+                    "Scroll Error"
                   );
                 } else if (response && !response.success) {
                   // Handle error response from background script
@@ -130,13 +236,15 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
                   const errorMsg = response.error || "Unknown error";
                   // Check if it's a "connection lost" error that might auto-recover
                   if (errorMsg.includes("Connection lost") && errorMsg.includes("try clicking the link again")) {
-                    alert(
-                      `Could not scroll to phrase: ${errorMsg}`
+                    await showAlert(
+                      `Could not scroll to phrase: ${errorMsg}`,
+                      "Scroll Error"
                     );
                   } else {
-                    alert(
+                    await showAlert(
                       `Could not scroll to phrase: ${errorMsg}\n\n` +
-                      "The main page may have been refreshed or closed."
+                      "The main page may have been refreshed or closed.",
+                      "Scroll Error"
                     );
                   }
                 }
@@ -144,7 +252,7 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
             );
           } else {
             // Normal content script - scroll directly
-            scrollToPageMatch(termForClick);
+            void scrollToPageMatch(termForClick);
           }
         });
 
@@ -187,11 +295,11 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
         container.appendChild(document.createTextNode(label));
       }
     }
-
-    lastIndex = index + full.length;
+    lastIndex = match.end;
+    }
   }
 
-  // Remaining text after last link
+  // Remaining text after last match
   if (lastIndex < text.length) {
     const tail = text.slice(lastIndex);
     if (tail) {
@@ -302,9 +410,9 @@ for (let i = 0; i < lines.length; i++) {
     h.textContent = content;
 
     h.style.fontWeight = "600";
-    h.style.marginTop = level === 1 ? "20px" : "16px";
-    h.style.marginBottom = "8px";
-    h.style.fontSize = level === 1 ? "15px" : "14px";
+    h.style.marginTop = level === 1 ? "24px" : level === 2 ? "20px" : "16px";
+    h.style.marginBottom = level === 1 ? "12px" : level === 2 ? "10px" : "8px";
+    h.style.fontSize = level === 1 ? "18px" : level === 2 ? "16px" : "14px";
 
     container.appendChild(h);
     continue;

@@ -66,3 +66,38 @@ export const GLOBAL_HIGHLIGHT_STYLE_CSS = `
     transition: background-color 0.2s ease-out;
   }
 `;
+
+export const LOADING_ANIMATION_CSS = `
+  @keyframes docs-summarizer-pulse {
+    0%, 100% {
+      opacity: 0.3;
+      transform: scale(0.8);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.2);
+    }
+  }
+`;
+
+export const MODAL_ANIMATION_CSS = `
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+`;

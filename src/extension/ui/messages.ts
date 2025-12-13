@@ -3,6 +3,37 @@ import { renderMarkdownInto } from "../markdown";
 import { PROMPT_VOICES } from "../prompts/voices";
 import { exportMessageAsMarkdown, exportMessageAsPDF } from "../export";
 
+/**
+ * Creates a loading indicator with three pulsing circles (like ChatGPT)
+ */
+function createLoadingIndicator(): HTMLElement {
+    const container = document.createElement("div");
+    container.className = "docs-summarizer-loading";
+    Object.assign(container.style, {
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        padding: "4px 0",
+    } as CSSStyleDeclaration);
+
+    // Create three pulsing circles
+    for (let i = 0; i < 3; i++) {
+        const circle = document.createElement("div");
+        circle.className = "docs-summarizer-loading-dot";
+        Object.assign(circle.style, {
+            width: "8px",
+            height: "8px",
+            borderRadius: "50%",
+            background: "#cccccc", // Match assistant text color
+            animation: `docs-summarizer-pulse 1.4s ease-in-out infinite`,
+            animationDelay: `${i * 0.2}s`, // Sequential animation
+        } as CSSStyleDeclaration);
+        container.appendChild(circle);
+    }
+
+    return container;
+}
+
 export function renderMessages(main: HTMLElement, msgs: Message[]): void {
     main.innerHTML = "";
 
@@ -14,7 +45,7 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
         } as CSSStyleDeclaration);
 
         const p = document.createElement("p");
-        p.textContent = `Click "Summarize page" or send a question to get started.`;
+        p.textContent = `Click "Summarize" or send a question to get started. Type \`--help\` to see all commands.`;
         placeholder.appendChild(p);
 
         main.appendChild(placeholder);
@@ -31,6 +62,7 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
         } as CSSStyleDeclaration);
 
         const bubble = document.createElement("div");
+        const isLoading = msg.role === "assistant" && msg.loading === true;
         Object.assign(bubble.style, {
             maxWidth: "80%",
             padding: "8px",
@@ -38,21 +70,33 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
             borderRadius: "6px",
             whiteSpace: "pre-wrap",
             lineHeight: "1.4",
-            background: msg.role === "user" ? "#4a5568" : "#1d1d1d", // Muted grey/blue for user messages
+            background: isLoading 
+                ? "transparent" // Transparent background for loading messages
+                : msg.role === "user" ? "#4a5568" : "#1d1d1d", // Muted grey/blue for user messages
             color: "#f5f5f5",
-            border: msg.role === "user"
-                ? "1px solid rgba(255,255,255,0.15)"
-                : "1px solid rgba(255,255,255,0.06)",
+            border: isLoading 
+                ? "none" // No border for loading messages
+                : msg.role === "user"
+                    ? "1px solid rgba(255,255,255,0.15)"
+                    : "1px solid rgba(255,255,255,0.06)",
             fontSize: "13px",
             position: "relative" // For absolute positioning of metadata
         } as CSSStyleDeclaration);
 
         if (msg.role === "assistant") {
-            // Render assistant messages with simple markdown formatting
-            renderMarkdownInto(bubble, msg.text);
+            // Check if this is a loading message
+            if (msg.loading === true) {
+                // Render loading indicator instead of text
+                const loadingIndicator = createLoadingIndicator();
+                bubble.appendChild(loadingIndicator);
+            } else {
+                // Render assistant messages with simple markdown formatting
+                renderMarkdownInto(bubble, msg.text);
+            }
 
             // Add metadata footer (response time, tokens, cost) in bottom-right
-            if (msg.responseTime !== undefined || msg.tokenUsage) {
+            // Don't show metadata for loading messages
+            if (!msg.loading && (msg.responseTime !== undefined || msg.tokenUsage)) {
                 const metadataContainer = document.createElement("div");
                 Object.assign(metadataContainer.style, {
                     position: "absolute",

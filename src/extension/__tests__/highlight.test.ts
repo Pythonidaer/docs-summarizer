@@ -1,6 +1,15 @@
 /** @jest-environment jsdom */
+
+// Mock modal before importing
+jest.mock("../ui/modal", () => ({
+  showAlert: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { findPageMatchElement, scrollToPageMatch } from "../highlight";
 import { DRAWER_ROOT_ID } from "../constants";
+import { showAlert } from "../ui/modal";
+
+const mockShowAlert = showAlert as jest.MockedFunction<typeof showAlert>;
 
 describe("findPageMatchElement", () => {
   test("finds a heading inside main and ignores drawer-root", () => {
@@ -33,7 +42,7 @@ describe("scrollToPageMatch", () => {
     document.body.innerHTML = "";
   });
 
-  test("wraps the matched phrase in an inline highlight span", () => {
+  test("wraps the matched phrase in an inline highlight span", async () => {
     // Basic page content
     document.body.innerHTML = `
       <main>
@@ -46,7 +55,7 @@ describe("scrollToPageMatch", () => {
     target.scrollIntoView = jest.fn() as any;
 
     // Act
-    scrollToPageMatch("Banana pudding");
+    await scrollToPageMatch("Banana pudding");
 
     // Assert: the paragraph should now contain a span wrapping the phrase
     const span = target.querySelector("span");
@@ -56,7 +65,7 @@ describe("scrollToPageMatch", () => {
     expect(span!.parentElement).toBe(target);
   });
 
-  test("falls back to block highlight when inline highlight fails", () => {
+  test("falls back to block highlight when inline highlight fails", async () => {
     document.body.innerHTML = `
       <main>
         <p id="para-2">This paragraph will trigger a fallback highlight.</p>
@@ -77,7 +86,7 @@ describe("scrollToPageMatch", () => {
       return range;
     };
 
-    scrollToPageMatch("fallback highlight");
+    await scrollToPageMatch("fallback highlight");
 
     // After a forced failure, we expect the element to have the block highlight class
     expect(target.classList.contains("docs-summarizer-page-highlight")).toBe(true);
@@ -92,7 +101,7 @@ describe("clearAllHighlights", () => {
     document.body.innerHTML = "";
   });
 
-  test("removes all inline highlight spans created by scrollToPageMatch", () => {
+  test("removes all inline highlight spans created by scrollToPageMatch", async () => {
     document.body.innerHTML = `
       <main>
         <p id="p1">Text with highlighted phrase here.</p>
@@ -108,8 +117,8 @@ describe("clearAllHighlights", () => {
     if (p1) p1.scrollIntoView = jest.fn() as any;
     if (p2) p2.scrollIntoView = jest.fn() as any;
     
-    scrollToPageMatch("highlighted phrase");
-    scrollToPageMatch("highlight");
+    await scrollToPageMatch("highlighted phrase");
+    await scrollToPageMatch("highlight");
 
     // Verify highlights were created
     const spansBefore = document.querySelectorAll("span[style*='background-color']");
@@ -126,7 +135,7 @@ describe("clearAllHighlights", () => {
     expect(document.body.textContent).toContain("highlight");
   });
 
-  test("removes all block highlight classes created by scrollToPageMatch", () => {
+  test("removes all block highlight classes created by scrollToPageMatch", async () => {
     document.body.innerHTML = `
       <main>
         <p id="p1">Paragraph one with target text</p>
@@ -143,7 +152,7 @@ describe("clearAllHighlights", () => {
     if (h1) h1.scrollIntoView = jest.fn() as any;
     
     // Create highlights
-    scrollToPageMatch("target text");
+    await scrollToPageMatch("target text");
 
     // Verify highlight was created
     const highlightedBefore = document.querySelectorAll(".docs-summarizer-page-highlight");
@@ -169,7 +178,7 @@ describe("clearAllHighlights", () => {
     expect(() => clearAllHighlights()).not.toThrow();
   });
 
-  test("clears both inline and block highlights together", () => {
+  test("clears both inline and block highlights together", async () => {
     document.body.innerHTML = `
       <main>
         <p id="p1">Text with inline highlight phrase.</p>
@@ -182,7 +191,7 @@ describe("clearAllHighlights", () => {
     if (p1) p1.scrollIntoView = jest.fn() as any;
     
     // Create both inline and block highlights
-    scrollToPageMatch("inline highlight phrase");
+    await scrollToPageMatch("inline highlight phrase");
 
     // Verify both were created
     const highlightedBefore = document.querySelectorAll(".docs-summarizer-page-highlight");
@@ -199,7 +208,7 @@ describe("clearAllHighlights", () => {
     expect(inlineSpans.length).toBe(0);
   });
 
-  test("can be called multiple times safely", () => {
+  test("can be called multiple times safely", async () => {
     document.body.innerHTML = `
       <main>
         <p id="p1">Some text with target phrase.</p>
@@ -211,7 +220,7 @@ describe("clearAllHighlights", () => {
     const p1 = document.getElementById("p1");
     if (p1) p1.scrollIntoView = jest.fn() as any;
     
-    scrollToPageMatch("target phrase");
+    await scrollToPageMatch("target phrase");
     clearAllHighlights();
     
     // Calling again should not throw
@@ -225,17 +234,15 @@ describe("scrollToPageMatch - edge cases", () => {
     document.body.innerHTML = "";
   });
 
-  test("shows alert when phrase not found in page text", () => {
+  test("shows alert when phrase not found in page text", async () => {
     document.body.innerHTML = `<main><p>Some text here</p></main>`;
     
-    const mockAlert = jest.fn();
-    (global as any).window.alert = mockAlert;
+    mockShowAlert.mockClear();
 
-    const { scrollToPageMatch } = require("../highlight");
-    scrollToPageMatch("phrase that does not exist");
+    await scrollToPageMatch("phrase that does not exist");
 
-    expect(mockAlert).toHaveBeenCalled();
-    expect(mockAlert.mock.calls[0]?.[0]).toContain("could not find that phrase");
+    expect(mockShowAlert).toHaveBeenCalled();
+    expect(mockShowAlert.mock.calls[0]?.[0]).toContain("could not find that phrase");
   });
 
   test("prefers main content over navigation", () => {
@@ -257,7 +264,38 @@ describe("scrollToPageMatch - edge cases", () => {
     expect(el?.closest("nav")).toBeNull();
   });
 
-  test("handles very long phrases", () => {
+  test("handles HTML entities like &nbsp; in phrase matching", () => {
+    // Simulate a paragraph with &nbsp; entities
+    document.body.innerHTML = `
+      <main>
+        <p>In one of Hitler's strokes of propaganda genius, the newly renamed&nbsp; National Socialist German Workers Party, or&nbsp; Nazi Party</p>
+      </main>
+    `;
+
+    const { findPageMatchElement } = require("../highlight");
+    // The phrase should match even though the HTML has &nbsp;
+    const el = findPageMatchElement("the newly renamed National Socialist German Workers Party");
+
+    expect(el).not.toBeNull();
+    expect(el?.tagName).toBe("P");
+  });
+
+  test("handles multiple spaces in phrase matching", () => {
+    document.body.innerHTML = `
+      <main>
+        <p>This   has    multiple     spaces   between   words</p>
+      </main>
+    `;
+
+    const { findPageMatchElement } = require("../highlight");
+    // Should match even with normalized spacing
+    const el = findPageMatchElement("has multiple spaces between");
+
+    expect(el).not.toBeNull();
+    expect(el?.tagName).toBe("P");
+  });
+
+  test("handles very long phrases", async () => {
     const longPhrase = "This is a very long phrase that contains many words and should still work correctly when searching for matches in the page content";
     document.body.innerHTML = `
       <main>
@@ -269,10 +307,10 @@ describe("scrollToPageMatch - edge cases", () => {
     const p = document.querySelector("p");
     if (p) p.scrollIntoView = jest.fn() as any;
 
-    expect(() => scrollToPageMatch(longPhrase)).not.toThrow();
+    await expect(scrollToPageMatch(longPhrase)).resolves.not.toThrow();
   });
 
-  test("handles special characters in phrase", () => {
+  test("handles special characters in phrase", async () => {
     const specialPhrase = "Text with (parentheses) and [brackets] and {braces}";
     document.body.innerHTML = `
       <main>
@@ -284,6 +322,6 @@ describe("scrollToPageMatch - edge cases", () => {
     const p = document.querySelector("p");
     if (p) p.scrollIntoView = jest.fn() as any;
 
-    expect(() => scrollToPageMatch(specialPhrase)).not.toThrow();
+    await expect(scrollToPageMatch(specialPhrase)).resolves.not.toThrow();
   });
 });

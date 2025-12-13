@@ -58,6 +58,17 @@ describe("renderInlineMarkdown", () => {
     expect(link!.textContent).toBe("section");
   });
 
+  test("handles trailing punctuation variations in phrase matching", () => {
+    setPageTextForLinks("The Night of the Long Knives was a significant event.");
+
+    const input = "See [Night of the Long Knives](#scroll:Night of the Long Knives)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toBe("Night of the Long Knives");
+  });
+
   test("validates scroll links with exact phrase matching", () => {
     setPageTextForLinks("What are you wanting certification in?");
 
@@ -173,6 +184,53 @@ describe("renderInlineMarkdown", () => {
     expect(link).toBeNull();
     expect(container.textContent).toContain("broken");
   });
+
+  test("renders bold text with **markers", () => {
+    const input = "This is **bold text** in a sentence.";
+    renderMarkdownInto(container, input);
+
+    const strong = container.querySelector("strong");
+    expect(strong).not.toBeNull();
+    expect(strong!.textContent).toBe("bold text");
+    expect(strong!.style.fontWeight).toBe("600");
+    expect(container.textContent).toContain("This is");
+    expect(container.textContent).toContain("in a sentence.");
+  });
+
+  test("renders multiple bold sections", () => {
+    const input = "**First** and **second** bold sections.";
+    renderMarkdownInto(container, input);
+
+    const strongElements = container.querySelectorAll("strong");
+    expect(strongElements.length).toBe(2);
+    expect(strongElements[0]!.textContent).toBe("First");
+    expect(strongElements[1]!.textContent).toBe("second");
+  });
+
+  test("renders bold text alongside links", () => {
+    const input = "See **bold link** at [Google](https://google.com).";
+    renderMarkdownInto(container, input);
+
+    const strong = container.querySelector("strong");
+    const link = container.querySelector("a");
+    expect(strong).not.toBeNull();
+    expect(strong!.textContent).toBe("bold link");
+    expect(link).not.toBeNull();
+    expect(link!.href).toContain("https://google.com");
+  });
+
+  test("does not render bold inside links", () => {
+    const input = "See [**bold** text](https://example.com).";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    // The bold markers should not create a separate <strong> element
+    const strong = container.querySelector("strong");
+    expect(strong).toBeNull();
+    // The link should contain the text including the asterisks
+    expect(link!.textContent).toContain("bold");
+  });
 });
 
 describe("renderMarkdownInto - block structure", () => {
@@ -227,6 +285,25 @@ describe("renderMarkdownInto - block structure", () => {
     const secondUlLis = uls[1]!.querySelectorAll("li");
     expect(secondUlLis[0]!.textContent).toContain("Another one");
     expect(secondUlLis[1]!.textContent).toContain("And another");
+  });
+
+  test("renders ordered lists with bold text correctly", () => {
+    const input = "1. **Rephrase your prompt**: Try different wording\n2. **Refresh the page**: Sometimes retrying works";
+    renderMarkdownInto(container, input);
+
+    const listItems = container.querySelectorAll("ol li");
+    expect(listItems.length).toBe(2);
+    
+    // Check that bold text is rendered, not duplicated
+    const firstItem = listItems[0];
+    const strongElements = firstItem!.querySelectorAll("strong");
+    expect(strongElements.length).toBe(1);
+    expect(strongElements[0]!.textContent).toBe("Rephrase your prompt");
+    
+    // Check that the text doesn't contain the asterisks
+    expect(firstItem!.textContent).not.toContain("**");
+    expect(firstItem!.textContent).toContain("Rephrase your prompt");
+    expect(firstItem!.textContent).toContain("Try different wording");
   });
 
   test("renders ordered lists from 1. and 1)", () => {

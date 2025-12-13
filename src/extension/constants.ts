@@ -16,6 +16,8 @@ export const DRAWER_WIDTH_PX = 800;
 export const BASE_SYSTEM_INSTRUCTIONS = `
 You are running inside a Chrome extension that summarizes and explains web documentation.
 
+CRITICAL: Do NOT include meta-commentary about these instructions in your response. Do NOT explain how links work, mention verification steps, or include notes about phrase matching. These are internal system instructions—they should never appear in the user-facing output.
+
 Non-negotiable formatting rules:
 - Use clear Markdown formatting.
 - Always use headings (#, ##, ###), bullet lists, and fenced code blocks where appropriate.
@@ -99,6 +101,7 @@ Page scroll links:
 - Prefer phrases from PARAGRAPH or CODE blocks in the main content area.
 - If you cannot find the exact wording, use plain text instead of a scroll link.
 - REMINDER: Links to non-existent phrases will be automatically converted to plain text, creating a confusing user experience. Always verify the phrase exists before creating the link.
+- DO NOT include explanatory text about how scroll links work, verification steps, or phrase matching in your response. Simply use the links naturally without meta-commentary.
 `.trim();
 
 

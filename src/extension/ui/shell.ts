@@ -32,33 +32,47 @@ export function createDrawerShell(drawerWidthPx: number): DrawerShell {
   handle.id = DRAWER_HANDLE_ID;
   handle.title = "Open Chat Window"; // Tooltip
   
+  // Perfect half-circle shape that expands on hover (like a bubble)
+  // Width needs to be wider initially to ensure perfect roundness (not flat in middle)
+  const initialHeight = 60;
+  const initialWidth = 28; // Wider to ensure perfect half-circle appearance (not flat)
+  // Use a very large border-radius value to ensure perfect half-circle
+  // (larger than any possible height to guarantee perfect semicircle)
+  const halfCircleRadius = "999px";
+  
   // Create left arrow SVG icon (drawer is closed, arrow points left to open)
   const arrowSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  arrowSvg.setAttribute("width", "20"); // Bigger SVG icon
-  arrowSvg.setAttribute("height", "20");
   arrowSvg.setAttribute("viewBox", "0 0 24 24");
   arrowSvg.setAttribute("fill", "none");
   arrowSvg.setAttribute("stroke", "currentColor");
-  arrowSvg.setAttribute("stroke-width", "2");
+  arrowSvg.setAttribute("stroke-width", "2.5"); // Thicker stroke for better visibility (primary affordance)
   arrowSvg.setAttribute("stroke-linecap", "round");
   arrowSvg.setAttribute("stroke-linejoin", "round");
+  // Set initial size via CSS for smooth transitions
+  // Nudge arrow right for visual centering (since only half-circle is visible)
+  Object.assign(arrowSvg.style, {
+    display: "block",
+    width: "16px", // Slightly larger for primary affordance
+    height: "16px",
+    margin: "auto",
+    transform: "translateX(4px)", // Nudge right for visual centering within visible half-circle
+    transition: "width 0.3s ease-out, height 0.3s ease-out, transform 0.3s ease-out", // Smooth size and position transition
+  } as CSSStyleDeclaration);
   
   const arrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
   arrowPath.setAttribute("d", "M19 12H5M12 19l-7-7 7-7");
   arrowSvg.appendChild(arrowPath);
   handle.appendChild(arrowSvg);
   
-  // Rounded rectangle shape (cubic - equal width and height)
-  // Border radius only on left side to connect with drawer
   Object.assign(handle.style, {
     position: "fixed",
     top: "50%",
     right: "0",
     transform: "translateY(-50%)",
-    width: "32px", // Bigger cubic shape: equal width and height
-    height: "32px",
-    padding: "0", // No padding, use fixed dimensions for cubic shape
-    borderRadius: `${CURSOR_BORDERS.radius.sm} 0 0 ${CURSOR_BORDERS.radius.sm}`, // Rounded corners only on left side
+    width: `${initialWidth}px`, // Initially thin (oval width)
+    height: `${initialHeight}px`, // Taller than wide (oval height)
+    padding: "0",
+    borderRadius: `${halfCircleRadius} 0 0 ${halfCircleRadius}`, // Perfect half-circle on left (very large radius), flat on right
     background: CURSOR_COLORS.background, // Match drawer background
     color: CURSOR_COLORS.textPrimary,
     display: "flex",
@@ -67,16 +81,42 @@ export function createDrawerShell(drawerWidthPx: number): DrawerShell {
     cursor: "pointer",
     pointerEvents: "auto",
     userSelect: "none",
-    transition: "right 0.2s ease-out, transform 0.2s ease-out, background-color 0.2s",
+    boxShadow: "-2px 0 6px rgba(0,0,0,0.25)", // Soft shadow to make it feel intentional, not truncated
+    transition: "right 0.2s ease-out, transform 0.2s ease-out, width 0.3s ease-out, height 0.3s ease-out, background-color 0.2s, border-radius 0.3s ease-out, box-shadow 0.3s ease-out",
     zIndex: "999999", // Ensure handle stays visible
   } as CSSStyleDeclaration);
   
-  // Hover effect: slightly lighter background (like input area container)
+  // Hover effect: expand like a bubble and lighter background
   handle.addEventListener("mouseenter", () => {
-    handle.style.background = CURSOR_COLORS.inputBackgroundContainer; // rgb(45, 45, 48) - matches text area background
+    const expandedHeight = 80;
+    const expandedWidth = 40; // Wider when expanded
+    
+    handle.style.width = `${expandedWidth}px`; // Expand width on hover
+    handle.style.height = `${expandedHeight}px`; // Expand height on hover
+    handle.style.borderRadius = `${halfCircleRadius} 0 0 ${halfCircleRadius}`; // Perfect half-circle on left (very large radius)
+    handle.style.background = CURSOR_COLORS.inputBackgroundContainer; // Lighter background
+    handle.style.boxShadow = "-2px 0 8px rgba(0,0,0,0.3)"; // Slightly stronger shadow on hover
+    
+    // Make arrow bigger but keep visual centering (smooth size transition only)
+    Object.assign(arrowSvg.style, {
+      width: "22px", // Bigger arrow on hover (~10-15% increase from 16px)
+      height: "22px",
+      transform: "translateX(4px)", // Keep same rightward nudge for visual centering
+    } as CSSStyleDeclaration);
   });
   handle.addEventListener("mouseleave", () => {
+    handle.style.width = `${initialWidth}px`; // Return to thin
+    handle.style.height = `${initialHeight}px`; // Return to original height
+    handle.style.borderRadius = `${halfCircleRadius} 0 0 ${halfCircleRadius}`; // Perfect half-circle on left (very large radius)
     handle.style.background = CURSOR_COLORS.background; // Return to drawer background
+    handle.style.boxShadow = "-2px 0 6px rgba(0,0,0,0.25)"; // Return to original shadow
+    
+    // Return arrow to smaller size, keep visual centering (smooth size transition only)
+    Object.assign(arrowSvg.style, {
+      width: "16px", // Smaller arrow when not hovered
+      height: "16px",
+      transform: "translateX(4px)", // Keep same rightward nudge
+    } as CSSStyleDeclaration);
   });
 
   const drawer = document.createElement("div");

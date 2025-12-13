@@ -62,6 +62,18 @@ export function buildInputForPageSummary(text: string, structureSummary?: string
   return lines.join("\n");
 }
 
+/**
+ * Strips scroll links from assistant messages to prevent the model from
+ * referencing its own generated (potentially invalid) phrases.
+ * Converts [text](#scroll:phrase) to just "text"
+ */
+function stripScrollLinks(text: string): string {
+  // Match both #scroll: and scroll: patterns
+  // Pattern: [label text](#scroll:phrase) or [label text](scroll:phrase)
+  // Replace with just the label text
+  return text.replace(/\[([^\]]+)\]\(#?scroll:[^)]+\)/g, "$1");
+}
+
 export function buildInputForConversation(
   pageText: string,
   history: Message[]
@@ -80,7 +92,12 @@ export function buildInputForConversation(
   } else {
     for (const msg of history) {
       const prefix = msg.role === "user" ? "User" : "Assistant";
-      lines.push(`${prefix}: ${msg.text}`);
+      // Strip scroll links from assistant messages to prevent model from
+      // referencing its own generated (potentially invalid) phrases
+      const messageText = msg.role === "assistant" 
+        ? stripScrollLinks(msg.text)
+        : msg.text;
+      lines.push(`${prefix}: ${messageText}`);
     }
   }
 
@@ -106,9 +123,14 @@ export function extractTokenUsage(data: any): TokenUsage | null {
   const usage = data.usage;
   
   // Handle both naming conventions
-  const inputTokens = usage.input_tokens ?? usage.prompt_tokens ?? 0;
-  const outputTokens = usage.output_tokens ?? usage.completion_tokens ?? 0;
+  const inputTokens = Math.max(0, usage.input_tokens ?? usage.prompt_tokens ?? 0);
+  const outputTokens = Math.max(0, usage.output_tokens ?? usage.completion_tokens ?? 0);
   const totalTokens = usage.total_tokens ?? (inputTokens + outputTokens);
+
+  // Guard against negative or invalid values
+  if (totalTokens < 0 || (inputTokens === 0 && outputTokens === 0 && !usage.total_tokens)) {
+    return null;
+  }
 
   // If we don't have both input and output, we can't calculate cost accurately
   if (inputTokens === 0 && outputTokens === 0) {
@@ -138,7 +160,8 @@ export async function callOpenAI(
   input: string,
   instructions: string,
   modelSettings: ModelSettings,
-  mode: CallMode
+  mode: CallMode,
+  history?: Message[] // Optional history for better error logging
 ): Promise<OpenAIResponse> {
   const apiKey = await ensureApiKey();
   if (!apiKey) {
@@ -188,7 +211,12 @@ export async function callOpenAI(
     throw new Error(`OpenAI error (invalid JSON, status ${status})`);
   }
 
-  console.groupCollapsed(
+  // Always expand logs for errors, collapse for success
+  const logGroup = (data?.status !== "completed" || data?.error)
+    ? console.group  // Always expanded for errors
+    : console.groupCollapsed; // Collapsed for success
+
+  logGroup(
     `[Docs Summarizer] OpenAI response (${mode}) – status ${status}`
   );
   console.log("Raw response JSON", data);
@@ -196,6 +224,25 @@ export async function callOpenAI(
   console.log("response.incomplete_details", data?.incomplete_details);
   console.log("response.error", data?.error);
   console.log("response.usage", data?.usage);
+  
+  // If incomplete or error, also log what we sent
+  if (data?.status !== "completed" || data?.error) {
+    console.log("Input length:", input.length, "chars");
+    console.log("Instructions length:", instructions.length, "chars");
+    console.log("Full input sent (last 2000 chars):", input.slice(-2000));
+    console.log("Full instructions sent (last 1000 chars):", instructions.slice(-1000));
+    
+    // For content_filter specifically, we'll log full input in the error section below
+    // But also log page text length here to understand context
+    if (data?.incomplete_details?.reason === "content_filter" && input.includes("=== PAGE CONTENT ===")) {
+      const pageContentMatch = input.match(/=== PAGE CONTENT[^=]*===\s*\n([\s\S]*?)\n\n=== CONVERSATION/);
+      if (pageContentMatch && pageContentMatch[1]) {
+        console.log("Page content length:", pageContentMatch[1].length, "chars");
+        console.log("Page content preview (first 500 chars):", pageContentMatch[1].slice(0, 500));
+      }
+    }
+  }
+  
   console.groupEnd();
 
   // HTTP-level error
@@ -218,6 +265,14 @@ export async function callOpenAI(
 
   // Responses API status field (completed / incomplete / failed / cancelled)
   if (data?.status && data.status !== "completed") {
+    // Try to extract any partial text that was generated before the filter triggered
+    let partialText = "";
+    try {
+      partialText = extractTextFromResponse(data) || "";
+    } catch (e) {
+      // Ignore extraction errors
+    }
+    
     const tokenUsage = extractTokenUsage(data);
     let tokenInfo = "";
     
@@ -225,17 +280,77 @@ export async function callOpenAI(
       if (tokenUsage) {
         tokenInfo = ` (Used ${tokenUsage.totalTokens.toLocaleString()} tokens, max was ${modelSettings.maxOutputTokens?.toLocaleString() || modelSettings.maxOutputTokens})`;
       } else if (data?.usage?.total_tokens) {
-        tokenInfo = ` (Used ${data.usage.total_tokens.toLocaleString()} tokens, max was ${modelSettings.maxOutputTokens?.toLocaleString() || modelSettings.maxOutputTokens})`;
+        const totalTokens = Math.max(0, data.usage.total_tokens);
+        tokenInfo = ` (Used ${totalTokens.toLocaleString()} tokens, max was ${modelSettings.maxOutputTokens?.toLocaleString() || modelSettings.maxOutputTokens})`;
       } else {
         tokenInfo = ` (Max tokens: ${modelSettings.maxOutputTokens?.toLocaleString() || modelSettings.maxOutputTokens})`;
+      }
+    }
+    
+    // Enhanced logging for content_filter errors
+    if (data?.incomplete_details?.reason === "content_filter") {
+      console.error("[Docs Summarizer] ⚠️ CONTENT FILTER TRIGGERED ⚠️");
+      console.error("Partial response text (before filter):", partialText || "(no partial text available)");
+      console.error("Partial text length:", partialText.length, "chars");
+      if (partialText) {
+        console.error("First 500 chars of partial response:", partialText.slice(0, 500));
+        console.error("Last 500 chars of partial response:", partialText.slice(-500));
+      }
+      console.error("Full incomplete_details:", JSON.stringify(data.incomplete_details, null, 2));
+      console.error("Full response data:", JSON.stringify(data, null, 2));
+      
+      // Log the input that was sent
+      console.error("=== FULL INPUT SENT (for content_filter analysis) ===");
+      console.error("Input length:", input.length, "chars");
+      console.error("Full input:", input);
+      console.error("=== FULL INSTRUCTIONS SENT ===");
+      console.error("Instructions length:", instructions.length, "chars");
+      console.error("Full instructions:", instructions);
+      
+      // Also log just the user's most recent message if we can extract it
+      if (input.includes("User:") || input.includes("=== CONVERSATION SO FAR ===")) {
+        const userMsgMatch = input.match(/User:\s*([^\n]+(?:\n(?!User:|Assistant:)[^\n]+)*)/);
+        if (userMsgMatch && userMsgMatch[1]) {
+          console.error("=== USER'S MOST RECENT MESSAGE ===");
+          console.error(userMsgMatch[1]);
+        }
+      }
+      
+      // Log conversation history if available
+      if (mode === "chat") {
+        if (history && history.length > 0) {
+          console.error("Conversation history (last 5 messages):");
+          history.slice(-5).forEach((msg, i) => {
+            const preview = msg.text.slice(0, 300);
+            console.error(`  [${i}] ${msg.role}: ${preview}${msg.text.length > 300 ? '...' : ''}`);
+          });
+          console.error("Total messages in history:", history.length);
+        } else if (input.includes("=== CONVERSATION SO FAR ===")) {
+          // Fallback: try to extract from input string
+          const historyStart = input.indexOf("=== CONVERSATION SO FAR ===");
+          const historyEnd = input.indexOf("Continue the conversation");
+          if (historyStart !== -1 && historyEnd !== -1) {
+            const historySection = input.slice(historyStart, historyEnd);
+            console.error("Conversation history section (from input):", historySection.slice(0, 2000));
+            // Count messages
+            const messageMatches = historySection.match(/(User|Assistant):/g);
+            console.error("Number of messages in history:", messageMatches?.length || 0);
+          }
+        }
       }
     }
     
     const details = data?.incomplete_details
       ? ` – details: ${JSON.stringify(data.incomplete_details)}`
       : "";
+    
+    // Include partial text in error message if available
+    const partialTextInfo = partialText 
+      ? `\n\n⚠️ Partial response before filter (${partialText.length} chars): "${partialText.slice(0, 200)}${partialText.length > 200 ? '...' : ''}"`
+      : "";
+    
     throw new Error(
-      `OpenAI response not completed (status: ${data.status})${tokenInfo}${details}`
+      `OpenAI response not completed (status: ${data.status})${tokenInfo}${details}${partialTextInfo}`
     );
   }
 
@@ -279,7 +394,7 @@ export async function summarizeWithOpenAI(
 
   console.log("[Docs Summarizer] Using prompt voice (summary)", { promptVoiceId });
 
-  return callOpenAI(input, instructions, modelSettings, "summary");
+  return callOpenAI(input, instructions, modelSettings, "summary", undefined);
 }
 
 export async function chatWithOpenAI(
@@ -300,7 +415,7 @@ export async function chatWithOpenAI(
 
   console.log("[Docs Summarizer] Using prompt voice (chat)", { promptVoiceId });
 
-  return callOpenAI(input, instructions, modelSettings, "chat");
+  return callOpenAI(input, instructions, modelSettings, "chat", history);
 }
 
 // ------------ Response extractor --------------

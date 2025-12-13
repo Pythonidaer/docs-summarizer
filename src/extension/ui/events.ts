@@ -6,6 +6,8 @@ import type { PromptVoiceId } from "../prompts/voices";
 import { extractPageTextFromDoc } from "../content-script";
 import { extractPageStructure, serializePageStructureForModel } from "../pageStructure";
 import { setPageTextForLinks } from "../pageText";
+import { showAlert } from "./modal";
+import { parseHelpCommand } from "../help";
 
 export interface WireDrawerEventsArgs {
   root: HTMLDivElement;
@@ -55,10 +57,40 @@ export function wireDrawerEvents({
     const userText = chatInput.value.trim();
     if (!userText) return;
 
+    // Check for help commands first (deterministic, no API call)
+    const helpResponse = parseHelpCommand(userText);
+    if (helpResponse) {
+      messages.push({
+        id: `user-${Date.now()}`,
+        role: "user",
+        text: userText,
+      });
+      
+      messages.push({
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        text: helpResponse,
+        voiceId: getPromptVoiceId(),
+      });
+      
+      renderMessages(main, messages);
+      chatInput.value = "";
+      return; // Don't call OpenAI for help commands
+    }
+
     messages.push({
       id: `user-${Date.now()}`,
       role: "user",
       text: userText,
+    });
+    
+    // Add loading message immediately
+    const loadingId = `loading-${Date.now()}`;
+    messages.push({
+      id: loadingId,
+      role: "assistant",
+      text: "",
+      loading: true,
     });
     renderMessages(main, messages);
     chatInput.value = "";
@@ -69,13 +101,19 @@ export function wireDrawerEvents({
 
       const result = await chatWithOpenAI(
         pageText,
-        messages,
+        messages.filter(m => !m.loading), // Exclude loading message from API call
         getUseCustomInstructions(),
         getCustomInstructions(),
         getPromptVoiceId(),
         getModelSettings()
       );
 
+      // Remove loading message and add actual response
+      const loadingIndex = messages.findIndex(m => m.id === loadingId);
+      if (loadingIndex !== -1) {
+        messages.splice(loadingIndex, 1);
+      }
+      
       messages.push({
         id: `assistant-${Date.now()}`,
         role: "assistant",
@@ -90,7 +128,30 @@ export function wireDrawerEvents({
       sendBtn.style.opacity = "1";
     } catch (err: any) {
       console.error("[Docs Summarizer] Chat error:", err);
-      alert(`Docs Summarizer chat error: ${err?.message ?? String(err)}`);
+      
+      // Remove loading message on error
+      const loadingIndex = messages.findIndex(m => m.id === loadingId);
+      if (loadingIndex !== -1) {
+        messages.splice(loadingIndex, 1);
+        renderMessages(main, messages);
+      }
+      
+      // Check if this is a content_filter error and show user-friendly message
+      const errorMessage = err?.message ?? String(err);
+      const isContentFilter = errorMessage.includes("content_filter") || 
+                             errorMessage.includes('"reason":"content_filter"');
+      
+      if (isContentFilter) {
+        await showAlert(
+          "OpenAI's safety system blocked this response because it detected potentially sensitive content.\n\n" +
+          "Try rephrasing your prompt with different wording, or break your request into smaller questions.\n\n" +
+          "Hint: Sometimes refreshing the page or summarizing the content first can help. OpenAI's content filter isn't entirely consistent.",
+          "Content Filtered"
+        );
+      } else {
+        await showAlert(`Docs Summarizer chat error: ${errorMessage}`, "Chat Error");
+      }
+      
       sendBtn.disabled = false;
       sendBtn.style.opacity = "1";
     }
@@ -128,6 +189,15 @@ export function wireDrawerEvents({
       role: "user",
       text: "Summarize",
     });
+    
+    // Add loading message immediately
+    const loadingId = `loading-${Date.now()}`;
+    messages.push({
+      id: loadingId,
+      role: "assistant",
+      text: "",
+      loading: true,
+    });
     renderMessages(main, messages);
 
     try {
@@ -163,19 +233,24 @@ export function wireDrawerEvents({
         }
         
         if (!currentPageText || currentPageText.trim().length === 0) {
-          // Remove user message since summary failed
+          // Remove user message and loading message since summary failed
           const userMessageIndex = messages.findIndex(m => m.id === userMessageId);
           if (userMessageIndex !== -1) {
             messages.splice(userMessageIndex, 1);
-            renderMessages(main, messages);
           }
+          const loadingIndex = messages.findIndex(m => m.id === loadingId);
+          if (loadingIndex !== -1) {
+            messages.splice(loadingIndex, 1);
+          }
+          renderMessages(main, messages);
           
-          alert(
+          await showAlert(
             "Docs Summarizer: No text found on this page.\n\n" +
             "This may be because:\n" +
             "• The page content hasn't loaded yet (try waiting a moment and clicking again)\n" +
             "• The page uses a format we can't extract text from\n" +
-            "• The page is empty or contains only images/media"
+            "• The page is empty or contains only images/media",
+            "No Text Found"
           );
             summarizeBtn.disabled = false;
             summarizeBtn.textContent = "Summarize"; // Always restore to this text
@@ -197,6 +272,12 @@ export function wireDrawerEvents({
         getModelSettings()
       );
 
+      // Remove loading message and add actual response
+      const loadingIndex = messages.findIndex(m => m.id === loadingId);
+      if (loadingIndex !== -1) {
+        messages.splice(loadingIndex, 1);
+      }
+
       const voiceId = getPromptVoiceId();
       messages.push({
         id: `assistant-${Date.now()}`,
@@ -208,20 +289,43 @@ export function wireDrawerEvents({
       });
       renderMessages(main, messages);
 
-        summarizeBtn.textContent = "Summarize"; // Always restore to this text
-        summarizeBtn.disabled = false;
+      summarizeBtn.textContent = "Summarize"; // Always restore to this text
+      summarizeBtn.disabled = false;
     } catch (err: any) {
+      // Remove loading message on error
+      const loadingIndex = messages.findIndex(m => m.id === loadingId);
+      if (loadingIndex !== -1) {
+        messages.splice(loadingIndex, 1);
+      }
+      
       // Remove user message since summary failed
       const userMessageIndex = messages.findIndex(m => m.id === userMessageId);
       if (userMessageIndex !== -1) {
         messages.splice(userMessageIndex, 1);
-        renderMessages(main, messages);
       }
       
+      renderMessages(main, messages);
+      
       console.error("[Docs Summarizer] Error:", err);
-      alert(`Docs Summarizer error: ${err?.message ?? String(err)}`);
+      
+      // Check if this is a content_filter error and show user-friendly message
+      const errorMessage = err?.message ?? String(err);
+      const isContentFilter = errorMessage.includes("content_filter") || 
+                             errorMessage.includes('"reason":"content_filter"');
+      
+      if (isContentFilter) {
+        await showAlert(
+          "OpenAI's safety system blocked this response because it detected potentially sensitive content.\n\n" +
+          "Try rephrasing your prompt with different wording, or break your request into smaller questions.\n\n" +
+          "Hint: Sometimes refreshing the page or summarizing the content first can help. OpenAI's content filter isn't entirely consistent.",
+          "Content Filtered"
+        );
+      } else {
+        await showAlert(`Docs Summarizer error: ${errorMessage}`, "Error");
+      }
+      
       summarizeBtn.disabled = false;
-        summarizeBtn.textContent = "Summarize"; // Always restore to this text
+      summarizeBtn.textContent = "Summarize"; // Always restore to this text
     }
   });
 

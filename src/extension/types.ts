@@ -11,6 +11,7 @@ export interface Message {
     id: string;
     role: MessageRole;
     text: string;
+    loading?: boolean; // True when waiting for OpenAI response
     voiceId?: string; // Optional: prompt voice ID used for assistant messages
     responseTime?: number; // Response time in seconds
     tokenUsage?: TokenUsage | null; // Token usage and cost information (null when not available)

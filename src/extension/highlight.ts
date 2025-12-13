@@ -1,5 +1,6 @@
 import { DRAWER_ROOT_ID } from "./constants";
 import { getPageTextForLinks } from "./pageText";
+import { showAlert } from "./ui/modal";
 
 let activeHighlights: HTMLElement[] = [];
 
@@ -16,12 +17,20 @@ export function findPageMatchElement(term: string): HTMLElement | null {
     const query = term.trim();
     if (!query) return null;
 
-    const targetLower = query.toLowerCase();
+    // Normalize the search term: lowercase and collapse whitespace (including &nbsp;)
+    // This matches the normalization used in scrollToPageMatch
+    const targetLower = query.toLowerCase().replace(/\s+/g, " ").trim();
     const extensionRoot = document.getElementById(DRAWER_ROOT_ID);
     const BASE_SELECTOR = "h1,h2,h3,h4,h5,h6,p,li,code,pre";
 
-    const getText = (el: HTMLElement): string =>
-        (el.innerText || el.textContent || "").toLowerCase();
+    // Normalize element text the same way: collapse all whitespace (including &nbsp;)
+    // innerText already converts &nbsp; to spaces, but we normalize multiple spaces
+    const getText = (el: HTMLElement): string => {
+        const raw = (el.innerText || el.textContent || "").toLowerCase();
+        // Normalize whitespace: collapse multiple spaces/newlines/tabs to single space
+        // This handles &nbsp; (which innerText converts to space) and multiple spaces
+        return raw.replace(/\s+/g, " ").trim();
+    };
 
     const pickBestMatch = (nodes: HTMLElement[], allowNav: boolean): HTMLElement | null => {
         const primary: HTMLElement[] = [];
@@ -36,6 +45,7 @@ export function findPageMatchElement(term: string): HTMLElement | null {
             if (style.display === "none" || style.visibility === "hidden") continue;
 
             const text = getText(el);
+            // Now both text and targetLower are normalized, so includes() should work
             if (!text.includes(targetLower)) continue;
 
             const navLike = el.closest(
@@ -116,7 +126,7 @@ export function clearAllHighlights(): void {
  *  - First: an exact phrase match inside a single text node
  *  - If that fails (phrase crosses links/nodes), highlight the whole element instead
  */
-export function scrollToPageMatch(term: string): void {
+export async function scrollToPageMatch(term: string): Promise<void> {
   console.log("[Docs Summarizer] scrollToPageMatch called", { term });
 
   const rawTerm = term.trim();
@@ -136,7 +146,7 @@ export function scrollToPageMatch(term: string): void {
   // We still use the same normalization as markdown.ts for consistency
   const body = document.body;
   if (!body) {
-    alert("Docs Summarizer: Page body not available.");
+    await showAlert("Docs Summarizer: Page body not available.", "Error");
     return;
   }
   
@@ -166,10 +176,11 @@ export function scrollToPageMatch(term: string): void {
       "Sample:",
       fullPageText.slice(0, 200)
     );
-    alert(
+    await showAlert(
       "Docs Summarizer could not find that phrase on this page.\n\n" +
         "The model may have referenced text that is not actually present " +
-        "or the page content may have changed since the summary was generated."
+        "or the page content may have changed since the summary was generated.",
+      "Phrase Not Found"
     );
     return;
   }
@@ -183,10 +194,11 @@ export function scrollToPageMatch(term: string): void {
       "[Docs Summarizer] No page match found for scroll target:",
       rawTerm
     );
-    alert(
+    await showAlert(
       "Docs Summarizer could not find that phrase on this page. " +
         "The model may have referenced text that is not actually present " +
-        "or used slightly different punctuation/wording."
+        "or used slightly different punctuation/wording.",
+      "Phrase Not Found"
     );
     return;
   }

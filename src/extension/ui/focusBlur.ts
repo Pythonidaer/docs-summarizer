@@ -1,5 +1,6 @@
 // src/extension/ui/focusBlur.ts
 import { DRAWER_ROOT_ID } from "../constants";
+import { CURSOR_COLORS } from "./design";
 
 const OVERLAY_ID_TOP = "docs-summarizer-blur-top";
 const OVERLAY_ID_BOTTOM = "docs-summarizer-blur-bottom";
@@ -20,7 +21,7 @@ export function injectBlurStyles(): void {
       z-index: 999998; /* below the drawer (999999 in shell.ts) */
       pointer-events: none;
       backdrop-filter: blur(6px) brightness(0.6);
-      background: rgba(15, 23, 42, 0.85); /* darker slate-like overlay */
+      background: ${CURSOR_COLORS.background}dd; /* Match UI background with transparency */
       transition: opacity 150ms ease-out;
       opacity: 0;
     }

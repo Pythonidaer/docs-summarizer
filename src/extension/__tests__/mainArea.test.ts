@@ -46,7 +46,8 @@ describe("createMainArea", () => {
     // Should show placeholder text
     const placeholder = main.querySelector("div");
     expect(placeholder).not.toBeNull();
-    expect(placeholder?.textContent).toContain("Summarize page");
+    expect(placeholder?.textContent).toContain("Summarize");
+    expect(placeholder?.textContent).toContain("--help");
   });
 });
 

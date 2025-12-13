@@ -16,6 +16,7 @@ import { summarizeWithOpenAI } from "../openai";
 import { extractPageTextFromDoc } from "../content-script";
 import { extractPageStructure, serializePageStructureForModel } from "../pageStructure";
 import { setPageTextForLinks } from "../pageText";
+import { showAlert } from "../ui/modal";
 import type { Message, ModelSettings } from "../types";
 import type { PromptVoiceId } from "../prompts/voices";
 
@@ -25,6 +26,7 @@ jest.mock("../content-script");
 jest.mock("../pageStructure");
 jest.mock("../pageText");
 jest.mock("../ui/messages");
+jest.mock("../ui/modal");
 
 const mockSummarizeWithOpenAI = summarizeWithOpenAI as jest.MockedFunction<typeof summarizeWithOpenAI>;
 const mockExtractPageTextFromDoc = extractPageTextFromDoc as jest.MockedFunction<typeof extractPageTextFromDoc>;
@@ -32,6 +34,7 @@ const mockExtractPageStructure = extractPageStructure as jest.MockedFunction<typ
 const mockSerializePageStructureForModel = serializePageStructureForModel as jest.MockedFunction<typeof serializePageStructureForModel>;
 const mockSetPageTextForLinks = setPageTextForLinks as jest.MockedFunction<typeof setPageTextForLinks>;
 const mockRenderMessages = renderMessages as jest.MockedFunction<typeof renderMessages>;
+const mockShowAlert = showAlert as jest.MockedFunction<typeof showAlert>;
 
 describe("wireDrawerEvents - summarize button", () => {
   let root: HTMLDivElement;
@@ -178,9 +181,8 @@ describe("wireDrawerEvents - summarize button", () => {
     const error = new Error("Summary failed");
     mockSummarizeWithOpenAI.mockRejectedValue(error);
 
-    // Mock alert to avoid actual alert in tests
-    const mockAlert = jest.fn();
-    global.alert = mockAlert;
+    // Mock showAlert to avoid actual modal in tests
+    mockShowAlert.mockResolvedValue(undefined);
 
     wireDrawerEvents({
       root,
@@ -206,7 +208,7 @@ describe("wireDrawerEvents - summarize button", () => {
 
     // Check that user message was removed after error
     expect(messages.length).toBe(0);
-    expect(mockAlert).toHaveBeenCalled();
+    expect(mockShowAlert).toHaveBeenCalled();
   });
 
   test("removes user message if no text found on page", async () => {
@@ -214,9 +216,8 @@ describe("wireDrawerEvents - summarize button", () => {
     pageText = "";
     mockExtractPageTextFromDoc.mockReturnValue("");
 
-    // Mock alert
-    const mockAlert = jest.fn();
-    global.alert = mockAlert;
+    // Mock showAlert to avoid actual modal in tests
+    mockShowAlert.mockResolvedValue(undefined);
 
     wireDrawerEvents({
       root,
@@ -244,7 +245,7 @@ describe("wireDrawerEvents - summarize button", () => {
     // Check that user message was not added (or was removed) when no text found
     const userMessages = messages.filter(m => m.role === "user" && m.text === "Summarize");
     expect(userMessages.length).toBe(0);
-    expect(mockAlert).toHaveBeenCalled();
+    expect(mockShowAlert).toHaveBeenCalled();
   });
 
   test("calls renderMessages after adding user message", async () => {
