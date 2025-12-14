@@ -268,6 +268,19 @@ describe("renderInlineMarkdown", () => {
     expect(link!.textContent).toBe("to Be an Artist");
     expect(link!.textContent).not.toContain("to Be an Artist to Be an Artist");
   });
+
+  test("removes duplicate two-word phrases with trailing punctuation", () => {
+    setPageTextForLinks("In humans, fingernails grow at an average rate of approx. 3.5 mm (0.14 in) a month");
+    const input = "[In humans, fingernails grow at an average rate of approx. 3.5 mm (0.14 in) a month a month)](#scroll:In humans, fingernails grow at an average rate of approx. 3.5 mm (0.14 in) a month)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    // Should remove the duplicate "a month" and the orphaned ")"
+    expect(link!.textContent).toBe("In humans, fingernails grow at an average rate of approx. 3.5 mm (0.14 in) a month");
+    expect(link!.textContent).not.toContain("a month a month");
+    expect(link!.textContent).not.toMatch(/a month\)$/);
+  });
 });
 
 describe("renderMarkdownInto - block structure", () => {

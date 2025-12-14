@@ -8,6 +8,7 @@ import { extractPageStructure, serializePageStructureForModel } from "../pageStr
 import { setPageTextForLinks } from "../pageText";
 import { showAlert } from "./modal";
 import { parseHelpCommand } from "../help";
+import { parseStyleCommands } from "../styleCommands";
 
 export interface WireDrawerEventsArgs {
   root: HTMLDivElement;
@@ -78,10 +79,13 @@ export function wireDrawerEvents({
       return; // Don't call OpenAI for help commands
     }
 
+    // Parse style commands from user input
+    const { text: cleanText, styleCommands } = parseStyleCommands(userText);
+
     messages.push({
       id: `user-${Date.now()}`,
       role: "user",
-      text: userText,
+      text: userText, // Store original text with commands for display
     });
     
     // Add loading message immediately
@@ -99,14 +103,29 @@ export function wireDrawerEvents({
       sendBtn.disabled = true;
       sendBtn.style.opacity = "0.5";
 
+      // Update the last message (user message) with cleaned text for API call if commands were parsed
+      const lastUserMessage = messages.filter(m => !m.loading && m.role === "user").pop();
+      let originalText: string | undefined;
+      if (lastUserMessage && cleanText !== userText) {
+        // Temporarily update the message text for the API call
+        originalText = lastUserMessage.text;
+        lastUserMessage.text = cleanText;
+      }
+
       const result = await chatWithOpenAI(
         pageText,
         messages.filter(m => !m.loading), // Exclude loading message from API call
         getUseCustomInstructions(),
         getCustomInstructions(),
         getPromptVoiceId(),
-        getModelSettings()
+        getModelSettings(),
+        styleCommands.length > 0 ? styleCommands : undefined
       );
+      
+      // Restore original text for display if we modified it
+      if (lastUserMessage && originalText !== undefined) {
+        lastUserMessage.text = originalText;
+      }
 
       // Remove loading message and add actual response
       const loadingIndex = messages.findIndex(m => m.id === loadingId);

@@ -100,41 +100,75 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
     
     // Remove duplicate phrases (e.g., "to Be an Artist to Be an Artist" → "to Be an Artist")
     // Also handles cases like "Hook in React 19 Hook in React 19)" → "Hook in React 19"
+    // And "a month a month)" → "a month"
     // This handles cases where the model accidentally duplicates part of the phrase
     const words = label.split(/\s+/);
     if (words.length > 2) {
-      // Normalize words by removing trailing punctuation for comparison (but keep original for display)
-      const normalizedWords = words.map(w => w.replace(/[)\]"'`]+$/, "").toLowerCase());
+      // Normalize words by removing leading and trailing punctuation for comparison
+      // This helps match "month" with "month)" and "cells." with "cells.)"
+      // IMPORTANT: Also normalize periods and other sentence-ending punctuation
+      const normalizedWords = words.map(w => 
+        w.replace(/^[(\['"`]+/, "")
+         .replace(/[)\]"'`.,;:!?]+$/, "") // Added periods and other sentence-ending punctuation
+         .toLowerCase()
+         .trim()
+      );
       
       // Check for duplicate sequences of 2-5 words (more flexible than just 3)
       // Start with longer sequences first to catch bigger duplicates
+      // Use a set to track which indices have been removed to avoid double-processing
+      const removedIndices = new Set<number>();
+      
       for (let seqLength = 5; seqLength >= 2; seqLength--) {
         for (let i = 0; i <= normalizedWords.length - seqLength; i++) {
-          const sequence = normalizedWords.slice(i, i + seqLength).join(" ");
+          // Skip if any word in this sequence was already removed
+          if (Array.from({ length: seqLength }, (_, k) => i + k).some(idx => removedIndices.has(idx))) {
+            continue;
+          }
+          
+          const sequence = normalizedWords.slice(i, i + seqLength).join(" ").trim();
+          if (!sequence) continue; // Skip empty sequences
+          
           // Look for this sequence appearing again later
           for (let j = i + seqLength; j <= normalizedWords.length - seqLength; j++) {
-            const laterSequence = normalizedWords.slice(j, j + seqLength).join(" ");
+            // Skip if any word in this sequence was already removed
+            if (Array.from({ length: seqLength }, (_, k) => j + k).some(idx => removedIndices.has(idx))) {
+              continue;
+            }
+            
+            const laterSequence = normalizedWords.slice(j, j + seqLength).join(" ").trim();
+            if (!laterSequence) continue; // Skip empty sequences
+            
             if (sequence === laterSequence) {
-              // Found duplicate - remove the later occurrence (both normalized and original)
-              normalizedWords.splice(j, seqLength);
-              words.splice(j, seqLength);
-              // Continue checking from the same position since we removed items
-              j--;
+              // Found duplicate - mark the later occurrence for removal
+              for (let k = 0; k < seqLength; k++) {
+                removedIndices.add(j + k);
+              }
+              // Break inner loop to avoid processing this sequence again
+              break;
             }
           }
         }
       }
-      label = words.join(" ").trim();
+      
+      // Rebuild label from words that weren't removed
+      const cleanedWords = words.filter((_, idx) => !removedIndices.has(idx));
+      label = cleanedWords.join(" ").trim();
     }
     
     // Clean up trailing punctuation that might be duplicated (e.g., "SS))" → "SS)")
-    // Remove duplicate closing parentheses, brackets, or quotes at the end
-    label = label.replace(/([)\]"'`])\1+$/, "$1");
+    // Remove duplicate closing parentheses, brackets, quotes, or periods at the end
+    label = label.replace(/([)\]"'`.,;:!?])\1+$/, "$1");
     
     // Additional cleanup: remove orphaned trailing punctuation that might be left after duplicate removal
     // e.g., "Hook in React 19)" → "Hook in React 19" (if the ) was part of a duplicate)
-    // This is a heuristic: if we have a single trailing punctuation after a space, it might be leftover
-    label = label.replace(/\s+([)\]"'`])$/, "");
+    // Also handles cases like "cells. )" → "cells." (orphaned closing paren after period)
+    // This is a heuristic: if we have trailing punctuation after a space, it might be leftover
+    label = label.replace(/\s+([)\]"'`.,;:!?])+$/, "");
+    
+    // Final cleanup: remove any trailing period followed by closing paren (e.g., "cells. )" → "cells.")
+    // This handles the specific case where we have ". )" at the end
+    label = label.replace(/\.\s*\)+$/, ".");
 
     const HASH_PREFIX = "#scroll:";
     const PLAIN_PREFIX = "scroll:";

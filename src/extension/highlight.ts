@@ -21,7 +21,7 @@ export function findPageMatchElement(term: string): HTMLElement | null {
     // This matches the normalization used in scrollToPageMatch
     const targetLower = query.toLowerCase().replace(/\s+/g, " ").trim();
     const extensionRoot = document.getElementById(DRAWER_ROOT_ID);
-    const BASE_SELECTOR = "h1,h2,h3,h4,h5,h6,p,li,code,pre";
+    const BASE_SELECTOR = "h1,h2,h3,h4,h5,h6,p,li,code,pre,figcaption,blockquote,dd,dt";
 
     // Normalize element text the same way: collapse all whitespace (including &nbsp;)
     // innerText already converts &nbsp; to spaces, but we normalize multiple spaces
@@ -30,6 +30,50 @@ export function findPageMatchElement(term: string): HTMLElement | null {
         // Normalize whitespace: collapse multiple spaces/newlines/tabs to single space
         // This handles &nbsp; (which innerText converts to space) and multiple spaces
         return raw.replace(/\s+/g, " ").trim();
+    };
+
+    /**
+     * Checks if an element is actually scrollable/visible.
+     * Returns true if the element can be scrolled into view, false otherwise.
+     */
+    const isElementScrollable = (el: HTMLElement): boolean => {
+        // Check if element itself is hidden (pickBestMatch already checks this, but double-check)
+        const style = window.getComputedStyle(el);
+        if (style.display === "none" || style.visibility === "hidden") {
+            return false;
+        }
+
+        // Check parent chain for hidden containers
+        // This catches cases where the element itself is visible but its parent nav/TOC is hidden
+        let current: HTMLElement | null = el.parentElement;
+        while (current && current !== document.body && current !== document.documentElement) {
+            const parentStyle = window.getComputedStyle(current);
+            // Check if parent is hidden
+            if (parentStyle.display === "none" || parentStyle.visibility === "hidden") {
+                return false;
+            }
+            // Check for collapsed containers (common pattern: height: 0px or maxHeight: 0px with overflow hidden)
+            if (parentStyle.maxHeight === "0px" || 
+                (parentStyle.height === "0px" && parentStyle.overflow !== "visible" && parentStyle.overflow !== "auto")) {
+                return false;
+            }
+            current = current.parentElement;
+        }
+
+        // Check if element has a valid bounding box (must have at least one dimension > 0)
+        // Note: In jsdom, getBoundingClientRect may return 0,0,0,0 even for visible elements,
+        // so we also check if the element has content as a fallback
+        const rect = el.getBoundingClientRect();
+        const hasSize = rect.width > 0 || rect.height > 0;
+        const hasContent = el.textContent && el.textContent.trim().length > 0;
+        
+        // If element has no size AND no content, it's likely not scrollable
+        if (!hasSize && !hasContent) {
+            return false;
+        }
+
+        // If element passes all checks, it should be scrollable
+        return true;
     };
 
     const pickBestMatch = (nodes: HTMLElement[], allowNav: boolean): HTMLElement | null => {
@@ -87,6 +131,16 @@ export function findPageMatchElement(term: string): HTMLElement | null {
     // Pass 2: structured elements, allow nav/TOC (e.g., headings inside sidebars)
     const second = pickBestMatch(structuredNodes, true);
     if (second) {
+        // CRITICAL: Before returning a nav/TOC match, verify it's actually scrollable
+        // If it's hidden or not scrollable, return null so error handling kicks in
+        if (!isElementScrollable(second)) {
+            console.warn(
+                "[Docs Summarizer] Found nav/TOC match for term but element is not scrollable/visible:",
+                term,
+                second
+            );
+            return null; // Return null so error message is shown to user
+        }
         console.warn("[Docs Summarizer] Using nav/TOC match for term:", term, second);
         return second;
     }

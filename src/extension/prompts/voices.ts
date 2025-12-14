@@ -74,7 +74,7 @@ Be practical and focus on real-world implications.
   },
   {
     id: "simplifier",
-    label: "Simplifier (ESL & ADHD-Friendly)",
+    label: "Simple Language",
     description: "Plain language, short sentences, minimal jargon, step-by-step.",
     instructions: `
 Use plain, everyday language to explain the content.
@@ -90,8 +90,8 @@ Focus on clarity so the user can understand everything on the first read.
   },
   {
     id: "organizer",
-    label: "Organizer & Memory Coach",
-    description: "Highly structured with recall prompts and key takeaways.",
+    label: "Organizer",
+    description: "Structured explanations with memory aids and key takeaways.",
     instructions: `
 Start with a high-level outline of the topic to give context.
 Clearly list the main sections or steps before diving into details.
@@ -151,7 +151,7 @@ Citation format:
   // ---------------------------------------------------------------------------
   {
     id: "mla_essay",
-    label: "Academic Essay (MLA-style)",
+    label: "MLA Essay",
     description: "Formal essay structure: intro, body, conclusion.",
     instructions: `
 Write in a formal, academic tone similar to an MLA-style essay.
@@ -215,8 +215,8 @@ Guidelines:
   // ---------------------------------------------------------------------------
   {
     id: "retrieval_coach",
-    label: "Retrieval Coach",
-    description: "Active recall questions with spaced repetition and metacognition.",
+    label: "Active Recall",
+    description: "Quiz format with active recall practice and spaced repetition.",
     instructions: `
 Act as a retrieval practice coach focused on strengthening memory through active recall and evidence-based learning strategies.
 
@@ -255,6 +255,7 @@ Structure:
 - After questions, provide a brief summary of key takeaways
 - End with a metacognitive reflection: "What was easiest? What needs more review?"
 - Optionally suggest when to review this material again (spaced repetition scheduling)
+- If creating a "Highlights" section, it MUST contain ONLY scroll links to actual phrases that exist on the page. Each link must use the exact phrase from the page as both the link text and the scroll target (e.g., [The oldest known leather shoe](#scroll:The oldest known leather shoe)). Do NOT include informational statements, definitions, or summaries in the Highlights section—those belong in a separate "Key Takeaways" or "Quick Recall Prompts" section if needed. The Highlights section should be purely navigational, helping users quickly jump to relevant sections on the page.
 
 Tone:
 - Encouraging and supportive, not judgmental

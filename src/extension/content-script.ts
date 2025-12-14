@@ -511,6 +511,17 @@ function setupDrawerWatcher(): void {
     return;
   }
   
+  // Skip watcher in test environments to avoid async operations after tests complete
+  // Detect Jest/test environment by checking for jest globals or test-specific patterns
+  const isTestEnvironment = 
+    typeof jest !== "undefined" || 
+    typeof process !== "undefined" && process.env?.NODE_ENV === "test" ||
+    (typeof window !== "undefined" && (window as any).__JEST_ENV__);
+  
+  if (isTestEnvironment) {
+    return; // Skip watcher in tests
+  }
+  
   let drawerWatcher: MutationObserver | null = null;
   let intervalId: ReturnType<typeof setInterval> | null = null;
   

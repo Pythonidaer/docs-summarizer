@@ -324,4 +324,179 @@ describe("scrollToPageMatch - edge cases", () => {
 
     await expect(scrollToPageMatch(specialPhrase)).resolves.not.toThrow();
   });
+
+  test("finds phrases in figcaption elements", () => {
+    // Simulate a figure with a figcaption containing a link
+    document.body.innerHTML = `
+      <main>
+        <figure>
+          <img src="test.jpg" alt="Test image">
+          <figcaption>Nails are a <a href="/wiki/Primate#Distinguishing_features" title="Primate">distinguishing feature</a> of the primate order.</figcaption>
+        </figure>
+      </main>
+    `;
+
+    const { findPageMatchElement } = require("../highlight");
+    // The phrase should be found even though it's split by a link inside the figcaption
+    const el = findPageMatchElement("Nails are a distinguishing feature of the primate order");
+
+    expect(el).not.toBeNull();
+    expect(el?.tagName).toBe("FIGCAPTION");
+    expect(el?.textContent).toContain("Nails are a distinguishing feature of the primate order");
+  });
+
+  test("finds phrases in figcaption with inline links", async () => {
+    // Simulate the exact scenario from the user's report
+    document.body.innerHTML = `
+      <main>
+        <figure>
+          <img src="test.jpg" alt="Test image">
+          <figcaption>Nails are a <a href="/wiki/Primate#Distinguishing_features" title="Primate">distinguishing feature</a> of the primate order.</figcaption>
+        </figure>
+      </main>
+    `;
+
+    const { scrollToPageMatch } = require("../highlight");
+    const figcaption = document.querySelector("figcaption");
+    if (figcaption) figcaption.scrollIntoView = jest.fn() as any;
+
+    // Should not throw and should find the phrase
+    await expect(scrollToPageMatch("Nails are a distinguishing feature of the primate order")).resolves.not.toThrow();
+    
+    // Verify the figcaption was found and highlighted
+    const highlighted = document.querySelector(".docs-summarizer-page-highlight");
+    expect(highlighted).not.toBeNull();
+    expect(highlighted?.tagName).toBe("FIGCAPTION");
+  });
+});
+
+describe("findPageMatchElement - nav/TOC visibility check", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("rejects nav/TOC matches that are hidden (display: none)", () => {
+    document.body.innerHTML = `
+      <nav style="display: none;">
+        <li>nail plate</li>
+      </nav>
+      <main>
+        <p>Some other content</p>
+      </main>
+    `;
+
+    const { findPageMatchElement } = require("../highlight");
+    const el = findPageMatchElement("nail plate");
+
+    // Should return null because nav is hidden, not find the hidden nav element
+    expect(el).toBeNull();
+  });
+
+  test("rejects nav/TOC matches that are collapsed (height: 0)", () => {
+    document.body.innerHTML = `
+      <nav style="height: 0; overflow: hidden;">
+        <li>nail matrix</li>
+      </nav>
+      <main>
+        <p>Some other content</p>
+      </main>
+    `;
+
+    const { findPageMatchElement } = require("../highlight");
+    const el = findPageMatchElement("nail matrix");
+
+    // Should return null because nav is collapsed
+    expect(el).toBeNull();
+  });
+
+  test("rejects nav/TOC matches that are invisible (visibility: hidden)", () => {
+    document.body.innerHTML = `
+      <nav style="visibility: hidden;">
+        <li>nail plate</li>
+      </nav>
+      <main>
+        <p>Some other content</p>
+      </main>
+    `;
+
+    const { findPageMatchElement } = require("../highlight");
+    const el = findPageMatchElement("nail plate");
+
+    // Should return null because nav is invisible
+    expect(el).toBeNull();
+  });
+
+  test("rejects nav/TOC matches that have zero bounding box", () => {
+    document.body.innerHTML = `
+      <nav style="position: absolute; width: 0; height: 0;">
+        <li>nail matrix</li>
+      </nav>
+      <main>
+        <p>Some other content</p>
+      </main>
+    `;
+
+    const { findPageMatchElement } = require("../highlight");
+    const el = findPageMatchElement("nail matrix");
+
+    // Should return null because nav has no size
+    expect(el).toBeNull();
+  });
+
+  test("accepts nav/TOC matches that are visible and scrollable", () => {
+    document.body.innerHTML = `
+      <nav style="display: block; visibility: visible;">
+        <li>nail plate</li>
+      </nav>
+      <main>
+        <p>Some other content</p>
+      </main>
+    `;
+
+    const { findPageMatchElement } = require("../highlight");
+    const el = findPageMatchElement("nail plate");
+
+    // Should return the nav element if it's visible and scrollable
+    expect(el).not.toBeNull();
+    expect(el?.closest("nav")).not.toBeNull();
+  });
+
+  test("prefers main content over visible nav/TOC", () => {
+    document.body.innerHTML = `
+      <nav style="display: block;">
+        <li>nail plate</li>
+      </nav>
+      <main>
+        <p>nail plate</p>
+      </main>
+    `;
+
+    const { findPageMatchElement } = require("../highlight");
+    const el = findPageMatchElement("nail plate");
+
+    // Should prefer main content even if nav is visible
+    expect(el).not.toBeNull();
+    expect(el?.closest("main")).not.toBeNull();
+    expect(el?.closest("nav")).toBeNull();
+  });
+
+  test("returns null for nav/TOC match when main content not found and nav is hidden", async () => {
+    document.body.innerHTML = `
+      <nav style="display: none;">
+        <li>nail plate</li>
+      </nav>
+      <main>
+        <p>Different content</p>
+      </main>
+    `;
+
+    mockShowAlert.mockClear();
+    const { scrollToPageMatch } = require("../highlight");
+
+    await scrollToPageMatch("nail plate");
+
+    // Should show error because nav match is hidden
+    expect(mockShowAlert).toHaveBeenCalled();
+    expect(mockShowAlert.mock.calls[0]?.[0]).toContain("could not find that phrase");
+  });
 });

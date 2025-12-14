@@ -3,6 +3,8 @@ import { ensureApiKey } from "./storage/apiKey";
 import { BASE_SYSTEM_INSTRUCTIONS, MARKDOWN_FORMAT_HINT, GPT5_NANO_PRICING } from "./constants";
 import type { Message, ModelSettings, TokenUsage } from "./types";
 import { getPromptVoiceInstructions, PromptVoiceId } from "./prompts/voices";
+import type { StyleCommand } from "./styleCommands";
+import { buildStyleInstructions } from "./styleCommands";
 
 export interface OpenAIResponse {
   text: string;
@@ -14,23 +16,32 @@ export interface BuildInstructionsOptions {
   useCustom: boolean;
   customInstructions: string;
   promptVoiceId?: PromptVoiceId; // optional for now
+  styleCommands?: StyleCommand[]; // Style modifier commands
 }
 
 export function buildInstructions(options: BuildInstructionsOptions): string {
-  const { useCustom, customInstructions, promptVoiceId } = options;
+  const { useCustom, customInstructions, promptVoiceId, styleCommands } = options;
 
   const pieces: string[] = [];
 
   // 1) System layer – always included
   pieces.push(BASE_SYSTEM_INSTRUCTIONS);
 
-  // 2) Prompt voice layer – selected style
+  // 2) Style commands layer – if present, add before voice to allow voice to override if needed
+  if (styleCommands && styleCommands.length > 0) {
+    const styleInstructions = buildStyleInstructions(styleCommands);
+    if (styleInstructions) {
+      pieces.push(styleInstructions);
+    }
+  }
+
+  // 3) Prompt voice layer – selected style
   const voiceInstructions = getPromptVoiceInstructions(promptVoiceId ?? "default");
   if (voiceInstructions.trim().length > 0) {
     pieces.push(voiceInstructions.trim());
   }
 
-  // 3) Custom layer – only if enabled and non-empty
+  // 4) Custom layer – only if enabled and non-empty
   if (useCustom) {
     const trimmed = customInstructions.trim();
     if (trimmed.length > 0) {
@@ -382,17 +393,22 @@ export async function summarizeWithOpenAI(
   useCustom: boolean,
   customInstructions: string,
   promptVoiceId: PromptVoiceId,
-  modelSettings: ModelSettings
+  modelSettings: ModelSettings,
+  styleCommands?: StyleCommand[]
 ): Promise<OpenAIResponse> {
   const input = buildInputForPageSummary(pageText, pageStructureSummary ?? "");
 
-  const instructions = buildInstructions({
+  const instructionsOptions: BuildInstructionsOptions = {
     useCustom,
     customInstructions,
     promptVoiceId,
-  });
+  };
+  if (styleCommands && styleCommands.length > 0) {
+    instructionsOptions.styleCommands = styleCommands;
+  }
+  const instructions = buildInstructions(instructionsOptions);
 
-  console.log("[Docs Summarizer] Using prompt voice (summary)", { promptVoiceId });
+  console.log("[Docs Summarizer] Using prompt voice (summary)", { promptVoiceId, styleCommands });
 
   return callOpenAI(input, instructions, modelSettings, "summary", undefined);
 }
@@ -403,17 +419,22 @@ export async function chatWithOpenAI(
   useCustom: boolean,
   customInstructions: string,
   promptVoiceId: PromptVoiceId,
-  modelSettings: ModelSettings
+  modelSettings: ModelSettings,
+  styleCommands?: StyleCommand[]
 ): Promise<OpenAIResponse> {
   const input = buildInputForConversation(pageText, history);
 
-  const instructions = buildInstructions({
+  const instructionsOptions: BuildInstructionsOptions = {
     useCustom,
     customInstructions,
     promptVoiceId,
-  });
+  };
+  if (styleCommands && styleCommands.length > 0) {
+    instructionsOptions.styleCommands = styleCommands;
+  }
+  const instructions = buildInstructions(instructionsOptions);
 
-  console.log("[Docs Summarizer] Using prompt voice (chat)", { promptVoiceId });
+  console.log("[Docs Summarizer] Using prompt voice (chat)", { promptVoiceId, styleCommands });
 
   return callOpenAI(input, instructions, modelSettings, "chat", history);
 }

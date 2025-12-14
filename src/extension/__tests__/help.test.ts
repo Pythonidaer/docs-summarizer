@@ -87,7 +87,7 @@ describe("parseHelpCommand", () => {
   it("recognizes --simplifier voice command", () => {
     const result = parseHelpCommand("--simplifier");
     expect(result).not.toBeNull();
-    expect(result).toContain("Simplifier");
+    expect(result).toContain("Simple Language");
   });
 
   it("recognizes --in-depth voice command", () => {
@@ -99,13 +99,13 @@ describe("parseHelpCommand", () => {
   it("recognizes --mla-essay voice command", () => {
     const result = parseHelpCommand("--mla-essay");
     expect(result).not.toBeNull();
-    expect(result).toContain("Academic Essay");
+    expect(result).toContain("MLA Essay");
   });
 
   it("recognizes --retrieval-coach voice command", () => {
     const result = parseHelpCommand("--retrieval-coach");
     expect(result).not.toBeNull();
-    expect(result).toContain("Retrieval Coach");
+    expect(result).toContain("Active Recall");
   });
 
   it("recognizes --visual-mapper voice command", () => {

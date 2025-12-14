@@ -15,8 +15,9 @@ describe("renderMessages", () => {
   test("shows placeholder when no messages", () => {
     renderMessages(main, []);
     
-    expect(main.innerHTML).toContain("Summarize page");
+    expect(main.innerHTML).toContain("Summarize");
     expect(main.innerHTML).toContain("get started");
+    expect(main.innerHTML).toContain("--help");
   });
 
   test("renders user message on the right with blue background", () => {

@@ -116,13 +116,28 @@ describe("Content Script Injection - Retry Logic", () => {
   });
 
   afterEach(() => {
+    // Clean up any drawer elements that might have been created
+    const drawer = document.getElementById(DRAWER_ROOT_ID);
+    if (drawer) {
+      drawer.remove();
+    }
+    
+    // Clear all timers before switching back to real timers
+    jest.runOnlyPendingTimers();
+    jest.clearAllTimers();
+    
     jest.useRealTimers();
+    
     // Restore original values
     Object.defineProperty(document, "readyState", {
       writable: true,
       configurable: true,
       value: originalReadyState,
     });
+    
+    // Clear any remaining DOM
+    document.body.innerHTML = "";
+    document.head.innerHTML = "";
   });
 
   test("should retry when body is empty on initial load", async () => {

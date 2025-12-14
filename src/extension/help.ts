@@ -69,6 +69,12 @@ function getHelpCommands(): HelpCommand[] {
       description: "List all prompt voices",
       content: getVoicesListContent(),
     },
+    {
+      command: "--style",
+      aliases: ["--styles", "--modifiers"],
+      description: "Style modifier commands",
+      content: getStyleCommandsContent(),
+    },
     // Individual voice commands
     ...PROMPT_VOICES.map(voice => {
       const baseCommand: Omit<HelpCommand, "aliases"> = {
@@ -99,6 +105,10 @@ function getMainHelpMenu(): string {
 ### Settings
 - \`--reasoning\` - Explanation of reasoning levels
 - \`--voices\` - List all prompt voices
+- \`--style\` - Style modifier commands
+
+### Style Modifiers
+- \`--N-paragraphs\` - Limit response to N paragraphs (e.g., \`--3-paragraphs\`)
 
 ### Prompt Voices
 ${PROMPT_VOICES.map(v => `- \`--${v.id.replace(/_/g, "-")}\` - ${v.description}`).join("\n")}
@@ -106,6 +116,7 @@ ${PROMPT_VOICES.map(v => `- \`--${v.id.replace(/_/g, "-")}\` - ${v.description}`
 ## Usage
 
 Type any command in the chat input (e.g., \`--help\`) to get detailed information.
+Style modifiers can be used with your question: "Explain React --3-paragraphs"
 
 Commands are case-insensitive and can use either \`--\` or \`-\` prefix.
 `;
@@ -288,6 +299,25 @@ ${getVoiceExamples(voice.id)}
 `;
 }
 
+function getStyleCommandsContent(): string {
+  return `# Style Modifiers
+
+Style modifiers change how the AI responds, allowing you to control the format of the response.
+
+## Paragraph Limits
+
+Use \`--N-paragraphs\` to control the length of the response:
+
+- \`--1-paragraph\` - Single paragraph response
+- \`--3-paragraphs\` - Exactly 3 paragraphs
+- \`--5-paragraphs\` - Exactly 5 paragraphs
+
+**Example**: "Summarize this page --3-paragraphs"
+
+The response will be exactly the specified number of paragraphs. Do not exceed or fall short of this requirement.
+`;
+}
+
 // Helper functions
 function getVoiceUseCase(voiceId: string): string {
   const useCases: Record<string, string> = {
@@ -301,7 +331,7 @@ function getVoiceUseCase(voiceId: string): string {
     mla_essay: "Academic writing - formal essay structure",
     technical_report: "Technical documentation - formal, structured",
     research_abstract: "Scientific content - concise, research-focused",
-    retrieval_coach: "Study and retention - quizzes and memory techniques",
+    retrieval_coach: "Active recall practice - quiz format with spaced repetition",
     visual_mapper: "Visual learners - concept maps and spatial organization",
     setup_guide: "Getting started - step-by-step setup instructions",
   };
@@ -320,7 +350,7 @@ function getVoiceExamples(voiceId: string): string {
     mla_essay: "Academic writing, formal essays, research papers",
     technical_report: "Technical documentation, API references, formal reports",
     research_abstract: "Scientific papers, research summaries, academic content",
-    retrieval_coach: "Study sessions, exam prep, memory training",
+    retrieval_coach: "Active recall practice, quiz-based learning, exam prep",
     visual_mapper: "Concept mapping, spatial learning, visual organization",
     setup_guide: "Installation guides, getting started tutorials, project setup",
   };
