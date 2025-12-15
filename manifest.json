@@ -3,10 +3,20 @@
   "name": "Docs Summarizer POC",
   "version": "0.1.0",
   "description": "Proof-of-concept extension to summarize documentation pages.",
+  "icons": {
+    "16": "icons/docs-summarizer-16.png",
+    "48": "icons/docs-summarizer-48.png",
+    "128": "icons/docs-summarizer-128.png"
+  },
   "permissions": ["activeTab", "scripting", "storage"],
   "optional_permissions": ["bookmarks"],
   "host_permissions": [],
   "action": {
+    "default_icon": {
+      "16": "icons/docs-summarizer-16.png",
+      "48": "icons/docs-summarizer-48.png",
+      "128": "icons/docs-summarizer-128.png"
+    },
     "default_title": "Docs Summarizer"
   },
   "background": {
