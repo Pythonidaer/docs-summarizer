@@ -13,7 +13,8 @@ import { wireDrawerEvents } from "./ui/events";
 import { chatWithOpenAI, summarizeWithOpenAI } from "./openai";
 import { renderMessages } from "./ui/messages";
 import { DEFAULT_MODEL_SETTINGS } from "./constants";
-import { showAlert } from "./ui/modal";
+import { showAlert, showModal } from "./ui/modal";
+import { deleteApiKey } from "./storage/apiKey";
 
 // Global state
 let messages: Message[] = [];
@@ -95,9 +96,27 @@ function initializeUI(): void {
   } as CSSStyleDeclaration);
 
   // Header
-  const { header, closeButton } = createHeader();
+  const { header, closeButton, deleteKeyButton } = createHeader();
   closeButton.addEventListener("click", () => {
     window.close();
+  });
+  
+  // Delete Key button handler
+  deleteKeyButton.addEventListener("click", () => {
+    showModal({
+      title: "Delete API Key",
+      message: "Are you sure you want to delete your API key? You will need to provide it again before using the application.",
+      type: "alert",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      onConfirm: async () => {
+        await deleteApiKey();
+        await showAlert("API key deleted successfully. You will be prompted to enter it again when you next use the application.");
+      },
+      onCancel: () => {
+        // User cancelled, do nothing
+      },
+    });
   });
 
   // Main content area (messages)

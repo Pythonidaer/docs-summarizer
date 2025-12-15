@@ -19,7 +19,8 @@ import { createMainArea } from "./ui/mainArea";
 import { DRAWER_STYLE_CSS, GLOBAL_HIGHLIGHT_STYLE_CSS, LOADING_ANIMATION_CSS, MODAL_ANIMATION_CSS } from "./ui/styles";
 import { setPageTextForLinks } from "./pageText";
 import { clearAllHighlights, scrollToPageMatch } from "./highlight";
-import { showAlert } from "./ui/modal";
+import { showAlert, showModal } from "./ui/modal";
+import { deleteApiKey } from "./storage/apiKey";
 import type { PromptVoiceId } from "./prompts/voices";
 import { wireDrawerEvents } from "./ui/events";
 import {
@@ -187,7 +188,25 @@ function createDrawerUI(): void {
   style.textContent = DRAWER_STYLE_CSS + LOADING_ANIMATION_CSS + MODAL_ANIMATION_CSS;
 
   // Header
-  const { header, closeButton } = createHeader();
+  const { header, closeButton, deleteKeyButton } = createHeader();
+  
+  // Delete Key button handler
+  deleteKeyButton.addEventListener("click", () => {
+    showModal({
+      title: "Delete API Key",
+      message: "Are you sure you want to delete your API key? You will need to provide it again before using the application.",
+      type: "alert",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      onConfirm: async () => {
+        await deleteApiKey();
+        await showAlert("API key deleted successfully. You will be prompted to enter it again when you next use the application.");
+      },
+      onCancel: () => {
+        // User cancelled, do nothing
+      },
+    });
+  });
 
   // Main content area (messages)
   const { main } = createMainArea(messages);

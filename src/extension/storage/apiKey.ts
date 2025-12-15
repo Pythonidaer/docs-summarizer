@@ -17,6 +17,13 @@ async function setApiKey(key: string): Promise<void> {
     });
 }
 
+// Delete API key from storage
+export async function deleteApiKey(): Promise<void> {
+    return new Promise((resolve) => {
+        chrome.storage.sync.remove(["openaiApiKey"], () => resolve());
+    });
+}
+
 // Ask user on first use if key is missing
 export async function ensureApiKey(): Promise<string | null> {
     const existing = await getApiKey();

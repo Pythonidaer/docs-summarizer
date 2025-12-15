@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { ensureApiKey } from "../storage/apiKey";
+import { ensureApiKey, deleteApiKey } from "../storage/apiKey";
 
 // Mock modal functions
 jest.mock("../ui/modal", () => ({
@@ -38,6 +38,17 @@ const mockChromeStorage = {
       // Actually update the mock storage synchronously
       Object.keys(items).forEach((key) => {
         mockStorage[key] = items[key];
+      });
+      // Call callback synchronously to match Chrome API behavior
+      if (callback) {
+        callback();
+      }
+    }),
+    remove: jest.fn((keys: string | string[], callback?: () => void) => {
+      // Remove keys from mockStorage
+      const keysToRemove = Array.isArray(keys) ? keys : [keys];
+      keysToRemove.forEach((key) => {
+        delete mockStorage[key];
       });
       // Call callback synchronously to match Chrome API behavior
       if (callback) {
@@ -233,6 +244,49 @@ describe("ensureApiKey", () => {
     const secondResult = await ensureApiKey();
     expect(secondResult).toBe("sk-first-call");
     expect(mockShowPrompt).not.toHaveBeenCalled(); // Should not prompt again
+  });
+});
+
+describe("deleteApiKey", () => {
+  test("removes API key from storage", async () => {
+    // Set up: store a key first
+    mockStorage.openaiApiKey = "sk-test-key";
+    expect(mockStorage.openaiApiKey).toBe("sk-test-key");
+
+    // Execute: delete the key
+    await deleteApiKey();
+
+    // Verify: key should be removed
+    expect(mockChromeStorage.sync.remove).toHaveBeenCalledWith(
+      ["openaiApiKey"],
+      expect.any(Function)
+    );
+    expect(mockStorage.openaiApiKey).toBeUndefined();
+  });
+
+  test("handles deletion when key does not exist", async () => {
+    // Set up: no key in storage
+    delete mockStorage.openaiApiKey;
+    expect(mockStorage.openaiApiKey).toBeUndefined();
+
+    // Execute: try to delete
+    await deleteApiKey();
+
+    // Verify: remove should still be called (Chrome API handles missing keys gracefully)
+    expect(mockChromeStorage.sync.remove).toHaveBeenCalledWith(
+      ["openaiApiKey"],
+      expect.any(Function)
+    );
+    expect(mockStorage.openaiApiKey).toBeUndefined();
+  });
+
+  test("resolves after deletion completes", async () => {
+    mockStorage.openaiApiKey = "sk-test-key";
+    
+    // Execute and verify it resolves
+    await expect(deleteApiKey()).resolves.toBeUndefined();
+    
+    expect(mockChromeStorage.sync.remove).toHaveBeenCalled();
   });
 });
 
