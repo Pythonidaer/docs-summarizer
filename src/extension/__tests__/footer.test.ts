@@ -48,7 +48,7 @@ describe("createFooter", () => {
     expect(chatInput.style.borderRadius).toBe("4px"); // Smaller radius now
     expect(chatInput.style.background === "transparent" || chatInput.style.background === "rgba(0, 0, 0, 0)").toBe(true); // Transparent, container provides background
     expect(chatInput.style.border === "none" || chatInput.style.border === "" || chatInput.style.border === "0px").toBe(true); // No border, container provides it
-    expect(chatInput.style.color).toBe("rgb(204, 204, 204)");
+    expect(chatInput.style.color).toBe("rgb(240, 238, 233)"); // CURSOR_COLORS.textPrimary (#F0EEE9)
     expect(chatInput.style.fontSize).toBe("13px");
     
     // Input should be inside a container

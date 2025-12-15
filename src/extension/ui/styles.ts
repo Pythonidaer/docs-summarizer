@@ -66,6 +66,20 @@ export const GLOBAL_HIGHLIGHT_STYLE_CSS = `
     color: #1a1a1a !important;
     transition: background-color 0.2s ease-out, color 0.2s ease-out;
   }
+  
+  /* Ensure code elements inside highlighted blocks have readable text */
+  .docs-summarizer-page-highlight code,
+  .docs-summarizer-page-highlight code * {
+    color: #1a1a1a !important;
+    background-color: transparent !important;
+  }
+  
+  /* Ensure code elements inside inline highlight spans have readable text */
+  .docs-summarizer-inline-highlight code,
+  .docs-summarizer-inline-highlight code * {
+    color: #1a1a1a !important;
+    background-color: transparent !important;
+  }
 `;
 
 export const LOADING_ANIMATION_CSS = `

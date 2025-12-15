@@ -12,11 +12,11 @@ import { showPrompt, showAlert } from "../ui/modal";
 const mockShowPrompt = showPrompt as jest.MockedFunction<typeof showPrompt>;
 const mockShowAlert = showAlert as jest.MockedFunction<typeof showAlert>;
 
-// Mock chrome.storage.sync
+// Mock chrome.storage.local
 const mockStorage: { [key: string]: any } = {};
 
 const mockChromeStorage = {
-  sync: {
+  local: {
     get: jest.fn((keys: string[] | { [key: string]: any }, callback: (result: any) => void) => {
       // Read from mockStorage at call time
       const result: any = {};
@@ -73,7 +73,7 @@ beforeEach(() => {
   mockShowAlert.mockResolvedValue(undefined);
   
   // Reset the get mock to read from current mockStorage
-  mockChromeStorage.sync.get.mockImplementation((keys: string[] | { [key: string]: any }, callback: (result: any) => void) => {
+  mockChromeStorage.local.get.mockImplementation((keys: string[] | { [key: string]: any }, callback: (result: any) => void) => {
     const result: any = {};
     if (Array.isArray(keys)) {
       keys.forEach((key) => {
@@ -88,7 +88,7 @@ beforeEach(() => {
   });
   
   // Reset the set mock to update mockStorage
-  mockChromeStorage.sync.set.mockImplementation((items: any, callback?: () => void) => {
+  mockChromeStorage.local.set.mockImplementation((items: any, callback?: () => void) => {
     Object.keys(items).forEach((key) => {
       mockStorage[key] = items[key];
     });
@@ -103,7 +103,7 @@ describe("ensureApiKey", () => {
     const result = await ensureApiKey();
 
     expect(result).toBe("sk-test123");
-    expect(mockChromeStorage.sync.get).toHaveBeenCalled();
+    expect(mockChromeStorage.local.get).toHaveBeenCalled();
     expect(mockShowPrompt).not.toHaveBeenCalled();
   });
 
@@ -115,10 +115,11 @@ describe("ensureApiKey", () => {
 
     expect(result).toBe("sk-user-entered-key");
     expect(mockShowPrompt).toHaveBeenCalledWith(
-      "Enter your OpenAI API key (will be stored in Chrome for this extension only):",
-      "sk-..."
+      "Docs Summarizer helps you quickly understand documentation pages by providing AI-powered summaries and answering your questions about the content.\n\nTo get started, paste your OpenAI API key into the input below:\n\n⚠️ **Security Notice**: Your key will be stored locally in Chrome for this extension only, and is only sent to OpenAI's API. You can always access security information by clicking the info icon next to the \"Delete Key\" button.",
+      "sk-...",
+      "Welcome to Docs Summarizer"
     );
-    expect(mockChromeStorage.sync.set).toHaveBeenCalledWith(
+    expect(mockChromeStorage.local.set).toHaveBeenCalledWith(
       { openaiApiKey: "sk-user-entered-key" },
       expect.any(Function)
     );
@@ -132,7 +133,7 @@ describe("ensureApiKey", () => {
 
     expect(result).toBeNull();
     expect(mockShowAlert).toHaveBeenCalledWith("No API key entered. Cannot call OpenAI.", "API Key Required");
-    expect(mockChromeStorage.sync.set).not.toHaveBeenCalled();
+    expect(mockChromeStorage.local.set).not.toHaveBeenCalled();
   });
 
   test("returns null when user enters empty string", async () => {
@@ -143,7 +144,7 @@ describe("ensureApiKey", () => {
 
     expect(result).toBeNull();
     expect(mockShowAlert).toHaveBeenCalledWith("No API key entered. Cannot call OpenAI.", "API Key Required");
-    expect(mockChromeStorage.sync.set).not.toHaveBeenCalled();
+    expect(mockChromeStorage.local.set).not.toHaveBeenCalled();
   });
 
   test("returns null when user enters only whitespace", async () => {
@@ -154,7 +155,7 @@ describe("ensureApiKey", () => {
 
     expect(result).toBeNull();
     expect(mockShowAlert).toHaveBeenCalledWith("No API key entered. Cannot call OpenAI.", "API Key Required");
-    expect(mockChromeStorage.sync.set).not.toHaveBeenCalled();
+    expect(mockChromeStorage.local.set).not.toHaveBeenCalled();
   });
 
   test("trims and stores the entered key", async () => {
@@ -164,7 +165,7 @@ describe("ensureApiKey", () => {
     const result = await ensureApiKey();
 
     expect(result).toBe("sk-test-key-with-spaces");
-    expect(mockChromeStorage.sync.set).toHaveBeenCalledWith(
+    expect(mockChromeStorage.local.set).toHaveBeenCalledWith(
       { openaiApiKey: "sk-test-key-with-spaces" },
       expect.any(Function)
     );
@@ -174,7 +175,7 @@ describe("ensureApiKey", () => {
     // Chrome storage.get can be called with object syntax: get({key: defaultValue})
     mockStorage.openaiApiKey = "sk-existing";
     // Simulate object syntax call
-    mockChromeStorage.sync.get.mockImplementation((keys: any, callback: any) => {
+    mockChromeStorage.local.get.mockImplementation((keys: any, callback: any) => {
       const result: any = {};
       if (typeof keys === "object" && !Array.isArray(keys)) {
         Object.keys(keys).forEach((key) => {
@@ -195,7 +196,7 @@ describe("ensureApiKey", () => {
 
   test("handles undefined storage value correctly", async () => {
     // Simulate storage returning undefined (not set)
-    mockChromeStorage.sync.get.mockImplementation((keys: any, callback: any) => {
+    mockChromeStorage.local.get.mockImplementation((keys: any, callback: any) => {
       callback({ openaiApiKey: undefined });
     });
 
@@ -221,14 +222,14 @@ describe("ensureApiKey", () => {
     expect(mockStorage.openaiApiKey).toBe("sk-first-call");
     
     // Verify set was called and actually updated storage
-    expect(mockChromeStorage.sync.set).toHaveBeenCalledWith(
+    expect(mockChromeStorage.local.set).toHaveBeenCalledWith(
       { openaiApiKey: "sk-first-call" },
       expect.any(Function)
     );
     
     // Manually verify the get mock would return the stored value
     const testResult: any = {};
-    mockChromeStorage.sync.get(
+    mockChromeStorage.local.get(
       ["openaiApiKey"],
       (result: any) => {
         Object.assign(testResult, result);
@@ -257,7 +258,7 @@ describe("deleteApiKey", () => {
     await deleteApiKey();
 
     // Verify: key should be removed
-    expect(mockChromeStorage.sync.remove).toHaveBeenCalledWith(
+    expect(mockChromeStorage.local.remove).toHaveBeenCalledWith(
       ["openaiApiKey"],
       expect.any(Function)
     );
@@ -273,7 +274,7 @@ describe("deleteApiKey", () => {
     await deleteApiKey();
 
     // Verify: remove should still be called (Chrome API handles missing keys gracefully)
-    expect(mockChromeStorage.sync.remove).toHaveBeenCalledWith(
+    expect(mockChromeStorage.local.remove).toHaveBeenCalledWith(
       ["openaiApiKey"],
       expect.any(Function)
     );
@@ -286,7 +287,7 @@ describe("deleteApiKey", () => {
     // Execute and verify it resolves
     await expect(deleteApiKey()).resolves.toBeUndefined();
     
-    expect(mockChromeStorage.sync.remove).toHaveBeenCalled();
+    expect(mockChromeStorage.local.remove).toHaveBeenCalled();
   });
 });
 

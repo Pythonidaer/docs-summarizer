@@ -47,6 +47,11 @@ const mockChrome = {
       if (callback) callback();
     }),
   },
+  action: {
+    onClicked: {
+      addListener: jest.fn(),
+    },
+  },
 };
 
 (global as any).chrome = mockChrome;
@@ -68,6 +73,7 @@ describe("background.ts", () => {
     // Verify listeners were registered
     expect(mockChrome.runtime.onMessage.addListener).toHaveBeenCalled();
     expect(mockChrome.windows.onRemoved.addListener).toHaveBeenCalled();
+    expect(mockChrome.action.onClicked.addListener).toHaveBeenCalled();
   });
 
   test("attempts to restore state from storage on startup", () => {

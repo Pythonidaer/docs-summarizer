@@ -25,7 +25,7 @@ function createLoadingIndicator(): HTMLElement {
             width: "8px",
             height: "8px",
             borderRadius: "50%",
-            background: "#cccccc", // Match assistant text color
+            background: "#F0EEE9", // Match assistant text color
             animation: `docs-summarizer-pulse 1.4s ease-in-out infinite`,
             animationDelay: `${i * 0.2}s`, // Sequential animation
         } as CSSStyleDeclaration);

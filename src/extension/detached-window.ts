@@ -13,7 +13,7 @@ import { wireDrawerEvents } from "./ui/events";
 import { chatWithOpenAI, summarizeWithOpenAI } from "./openai";
 import { renderMessages } from "./ui/messages";
 import { DEFAULT_MODEL_SETTINGS } from "./constants";
-import { showAlert, showModal } from "./ui/modal";
+import { showAlert, showModal, showSecurityFAQ } from "./ui/modal";
 import { deleteApiKey } from "./storage/apiKey";
 
 // Global state
@@ -96,9 +96,14 @@ function initializeUI(): void {
   } as CSSStyleDeclaration);
 
   // Header
-  const { header, closeButton, deleteKeyButton } = createHeader();
+  const { header, closeButton, deleteKeyButton, infoButton } = createHeader();
   closeButton.addEventListener("click", () => {
     window.close();
+  });
+  
+  // Info button handler
+  infoButton.addEventListener("click", () => {
+    showSecurityFAQ();
   });
   
   // Delete Key button handler

@@ -16,7 +16,7 @@ export const CURSOR_COLORS = {
   inputBorderHover: "rgba(255, 255, 255, 0.2)",
   
   // Text
-  textPrimary: "#cccccc", // Primary text (slightly softer than #f5f5f5)
+  textPrimary: "#F0EEE9", // Primary text (light cream/beige)
   textSecondary: "#858585", // Secondary text
   textMuted: "#6a6a6a", // Muted text
   

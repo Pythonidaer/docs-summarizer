@@ -319,6 +319,7 @@ export async function scrollToPageMatch(term: string): Promise<void> {
     range.setEnd(textNode, index + lowerTerm.length);
 
     const span = document.createElement("span");
+    span.className = "docs-summarizer-inline-highlight"; // Add class for CSS targeting
     span.style.backgroundColor = "#FFD6A5"; // Light orange/peach for spanned highlights
     span.style.color = "#1a1a1a"; // Dark text for readability on light background
     span.style.borderRadius = "2px";

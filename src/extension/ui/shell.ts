@@ -129,7 +129,7 @@ export function createDrawerShell(drawerWidthPx: number): DrawerShell {
     width: `${drawerWidthPx}px`,
     maxWidth: "80vw",
     background: "#1e1e1e",
-    color: "#cccccc",
+    color: "#F0EEE9",
     boxShadow: "0 0 16px rgba(0,0,0,0.6)",
     display: "flex",
     flexDirection: "column",

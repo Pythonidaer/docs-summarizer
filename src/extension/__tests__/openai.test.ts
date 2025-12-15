@@ -269,7 +269,7 @@ describe("buildInputForConversation", () => {
 });
 
 describe("callOpenAI", () => {
-  const mockFetch = jest.fn();
+  const mockSendMessage = jest.fn();
   const defaultModelSettings: ModelSettings = {
     model: "gpt-5-nano",
     reasoningEffort: "low",
@@ -278,24 +278,34 @@ describe("callOpenAI", () => {
   };
 
   beforeAll(() => {
-    global.fetch = mockFetch;
+    // Mock chrome.runtime.sendMessage
+    (global as any).chrome = {
+      runtime: {
+        sendMessage: mockSendMessage,
+        lastError: null,
+      },
+    };
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockEnsureApiKey.mockResolvedValue("sk-test-key");
+    // Reset lastError
+    (global as any).chrome.runtime.lastError = null;
   });
 
   test("successfully calls OpenAI API and returns text", async () => {
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      json: jest.fn().mockResolvedValue({
-        status: "completed",
-        output_text: "This is the response text",
-      }),
-    };
-    mockFetch.mockResolvedValue(mockResponse);
+    // Mock background script response
+    mockSendMessage.mockImplementation((message, callback) => {
+      if (message.type === "OPENAI_REQUEST") {
+        callback({
+          success: true,
+          text: "This is the response text",
+          responseTime: 1.5,
+          tokenUsage: null,
+        });
+      }
+    });
 
     const result = await callOpenAI(
       "Test input",
@@ -305,18 +315,21 @@ describe("callOpenAI", () => {
     );
 
     expect(result.text).toBe("This is the response text");
-    expect(result.responseTime).toBeGreaterThan(0);
-    expect(result.tokenUsage).toBeNull(); // No usage data in mock
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.openai.com/v1/responses",
+    expect(result.responseTime).toBe(1.5);
+    expect(result.tokenUsage).toBeNull();
+    expect(mockSendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          Authorization: "Bearer sk-test-key",
-          "Content-Type": "application/json",
+        type: "OPENAI_REQUEST",
+        payload: expect.objectContaining({
+          input: "Test input",
+          instructions: "Test instructions",
+          modelSettings: expect.objectContaining({
+            model: "gpt-5-nano",
+          }),
+          mode: "summary",
         }),
-        body: expect.stringContaining('"model":"gpt-5-nano"'),
-      })
+      }),
+      expect.any(Function)
     );
   });
 
@@ -326,17 +339,21 @@ describe("callOpenAI", () => {
     await expect(
       callOpenAI("Test input", "Test instructions", defaultModelSettings, "summary")
     ).rejects.toThrow("API key missing");
+    
+    // Should not send message if key is missing
+    expect(mockSendMessage).not.toHaveBeenCalled();
   });
 
   test("throws error on HTTP error status", async () => {
-    const mockResponse = {
-      ok: false,
-      status: 401,
-      json: jest.fn().mockResolvedValue({
-        error: { message: "Invalid API key" },
-      }),
-    };
-    mockFetch.mockResolvedValue(mockResponse);
+    // Mock background script error response
+    mockSendMessage.mockImplementation((message, callback) => {
+      if (message.type === "OPENAI_REQUEST") {
+        callback({
+          error: "OpenAI error: Invalid API key",
+          errorType: "HTTP_ERROR",
+        });
+      }
+    });
 
     await expect(
       callOpenAI("Test input", "Test instructions", defaultModelSettings, "summary")
@@ -344,12 +361,15 @@ describe("callOpenAI", () => {
   });
 
   test("throws error on invalid JSON response", async () => {
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      json: jest.fn().mockRejectedValue(new Error("Invalid JSON")),
-    };
-    mockFetch.mockResolvedValue(mockResponse);
+    // Mock background script error response
+    mockSendMessage.mockImplementation((message, callback) => {
+      if (message.type === "OPENAI_REQUEST") {
+        callback({
+          error: "OpenAI error (invalid JSON, status 200)",
+          errorType: "PARSE_ERROR",
+        });
+      }
+    });
 
     await expect(
       callOpenAI("Test input", "Test instructions", defaultModelSettings, "summary")
@@ -357,15 +377,15 @@ describe("callOpenAI", () => {
   });
 
   test("throws error when response status is not 'completed'", async () => {
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      json: jest.fn().mockResolvedValue({
-        status: "incomplete",
-        incomplete_details: { reason: "max_tokens" },
-      }),
-    };
-    mockFetch.mockResolvedValue(mockResponse);
+    // Mock background script error response
+    mockSendMessage.mockImplementation((message, callback) => {
+      if (message.type === "OPENAI_REQUEST") {
+        callback({
+          error: "OpenAI response not completed (status: incomplete)",
+          errorType: "INCOMPLETE_RESPONSE",
+        });
+      }
+    });
 
     await expect(
       callOpenAI("Test input", "Test instructions", defaultModelSettings, "summary")
@@ -373,15 +393,15 @@ describe("callOpenAI", () => {
   });
 
   test("throws error when response is empty", async () => {
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      json: jest.fn().mockResolvedValue({
-        status: "completed",
-        output: [],
-      }),
-    };
-    mockFetch.mockResolvedValue(mockResponse);
+    // Mock background script error response
+    mockSendMessage.mockImplementation((message, callback) => {
+      if (message.type === "OPENAI_REQUEST") {
+        callback({
+          error: "The model returned an empty response (no text blocks found). Try reducing the amount of page text or adjusting instructions.",
+          errorType: "EMPTY_RESPONSE",
+        });
+      }
+    });
 
     await expect(
       callOpenAI("Test input", "Test instructions", defaultModelSettings, "summary")
@@ -389,24 +409,17 @@ describe("callOpenAI", () => {
   });
 
   test("extracts text from structured output when output_text is missing", async () => {
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      json: jest.fn().mockResolvedValue({
-        status: "completed",
-        output: [
-          {
-            content: [
-              {
-                type: "output_text",
-                text: "Text from structured output",
-              },
-            ],
-          },
-        ],
-      }),
-    };
-    mockFetch.mockResolvedValue(mockResponse);
+    // Mock background script success response
+    mockSendMessage.mockImplementation((message, callback) => {
+      if (message.type === "OPENAI_REQUEST") {
+        callback({
+          success: true,
+          text: "Text from structured output",
+          responseTime: 1.0,
+          tokenUsage: null,
+        });
+      }
+    });
 
     const result = await callOpenAI(
       "Test input",
@@ -419,15 +432,17 @@ describe("callOpenAI", () => {
   });
 
   test("sends correct model settings in request", async () => {
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      json: jest.fn().mockResolvedValue({
-        status: "completed",
-        output_text: "Response",
-      }),
-    };
-    mockFetch.mockResolvedValue(mockResponse);
+    // Mock background script success response
+    mockSendMessage.mockImplementation((message, callback) => {
+      if (message.type === "OPENAI_REQUEST") {
+        callback({
+          success: true,
+          text: "Response",
+          responseTime: 1.0,
+          tokenUsage: null,
+        });
+      }
+    });
 
     const modelSettings: ModelSettings = {
       model: "gpt-5-mini",
@@ -438,17 +453,37 @@ describe("callOpenAI", () => {
 
     await callOpenAI("Test input", "Test instructions", modelSettings, "chat");
 
-    const callArgs = mockFetch.mock.calls[0];
-    const body = JSON.parse(callArgs[1].body);
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "OPENAI_REQUEST",
+        payload: expect.objectContaining({
+          modelSettings: expect.objectContaining({
+            model: "gpt-5-mini",
+            reasoningEffort: "medium",
+            verbosity: "high",
+          }),
+        }),
+      }),
+      expect.any(Function)
+    );
+  });
 
-    expect(body.model).toBe("gpt-5-mini");
-    expect(body.reasoning.effort).toBe("medium");
-    expect(body.text.verbosity).toBe("high");
+  test("handles chrome.runtime.lastError", async () => {
+    // Mock chrome runtime error - callback is called but lastError is set
+    mockSendMessage.mockImplementation((message, callback) => {
+      (global as any).chrome.runtime.lastError = { message: "Extension context invalidated" };
+      // Call callback but lastError will be checked
+      callback({});
+    });
+
+    await expect(
+      callOpenAI("Test input", "Test instructions", defaultModelSettings, "summary")
+    ).rejects.toThrow("Extension error: Extension context invalidated");
   });
 });
 
 describe("summarizeWithOpenAI", () => {
-  const mockFetch = jest.fn();
+  const mockSendMessage = jest.fn();
   const defaultModelSettings: ModelSettings = {
     model: "gpt-5-nano",
     reasoningEffort: "low",
@@ -457,24 +492,33 @@ describe("summarizeWithOpenAI", () => {
   };
 
   beforeAll(() => {
-    global.fetch = mockFetch;
+    // Mock chrome.runtime.sendMessage
+    (global as any).chrome = {
+      runtime: {
+        sendMessage: mockSendMessage,
+        lastError: null,
+      },
+    };
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockEnsureApiKey.mockResolvedValue("sk-test-key");
+    (global as any).chrome.runtime.lastError = null;
   });
 
   test("calls OpenAI with correct summary input", async () => {
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      json: jest.fn().mockResolvedValue({
-        status: "completed",
-        output_text: "Summary response",
-      }),
-    };
-    mockFetch.mockResolvedValue(mockResponse);
+    // Mock background script success response
+    mockSendMessage.mockImplementation((message, callback) => {
+      if (message.type === "OPENAI_REQUEST") {
+        callback({
+          success: true,
+          text: "Summary response",
+          responseTime: 1.0,
+          tokenUsage: null,
+        });
+      }
+    });
 
     const result = await summarizeWithOpenAI(
       "Page text content",
@@ -486,22 +530,33 @@ describe("summarizeWithOpenAI", () => {
     );
 
     expect(result.text).toBe("Summary response");
-    const callArgs = mockFetch.mock.calls[0];
-    const body = JSON.parse(callArgs[1].body);
-    expect(body.input).toContain("Page text content");
-    expect(body.input).toContain("Structure summary");
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "OPENAI_REQUEST",
+        payload: expect.objectContaining({
+          input: expect.stringContaining("Page text content"),
+        }),
+      }),
+      expect.any(Function)
+    );
+    // Verify structure summary is included in the input
+    const callArgs = mockSendMessage.mock.calls[0];
+    const payload = callArgs[0].payload;
+    expect(payload.input).toContain("Structure summary");
   });
 
   test("handles null pageStructureSummary", async () => {
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      json: jest.fn().mockResolvedValue({
-        status: "completed",
-        output_text: "Summary",
-      }),
-    };
-    mockFetch.mockResolvedValue(mockResponse);
+    // Mock background script success response
+    mockSendMessage.mockImplementation((message, callback) => {
+      if (message.type === "OPENAI_REQUEST") {
+        callback({
+          success: true,
+          text: "Summary",
+          responseTime: 1.0,
+          tokenUsage: null,
+        });
+      }
+    });
 
     await summarizeWithOpenAI(
       "Page text",
@@ -512,22 +567,24 @@ describe("summarizeWithOpenAI", () => {
       defaultModelSettings
     );
 
-    const callArgs = mockFetch.mock.calls[0];
-    const body = JSON.parse(callArgs[1].body);
-    // Should not include structure summary section if null
-    expect(body.input).not.toContain("Structure summary");
+    // Verify structure summary is NOT included in the input
+    const callArgs = mockSendMessage.mock.calls[0];
+    const payload = callArgs[0].payload;
+    expect(payload.input).not.toContain("Structure summary");
   });
 
   test("includes custom instructions when enabled", async () => {
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      json: jest.fn().mockResolvedValue({
-        status: "completed",
-        output_text: "Summary",
-      }),
-    };
-    mockFetch.mockResolvedValue(mockResponse);
+    // Mock background script success response
+    mockSendMessage.mockImplementation((message, callback) => {
+      if (message.type === "OPENAI_REQUEST") {
+        callback({
+          success: true,
+          text: "Summary",
+          responseTime: 1.0,
+          tokenUsage: null,
+        });
+      }
+    });
 
     await summarizeWithOpenAI(
       "Page text",
@@ -538,15 +595,16 @@ describe("summarizeWithOpenAI", () => {
       defaultModelSettings
     );
 
-    const callArgs = mockFetch.mock.calls[0];
-    const body = JSON.parse(callArgs[1].body);
-    expect(body.instructions).toContain("Custom instruction text");
-    expect(body.instructions).toContain(getPromptVoiceInstructions("teacher"));
+    // Verify custom instructions are included
+    const callArgs = mockSendMessage.mock.calls[0];
+    const payload = callArgs[0].payload;
+    expect(payload.instructions).toContain("Custom instruction text");
+    expect(payload.instructions).toContain(getPromptVoiceInstructions("teacher"));
   });
 });
 
 describe("chatWithOpenAI", () => {
-  const mockFetch = jest.fn();
+  const mockSendMessage = jest.fn();
   const defaultModelSettings: ModelSettings = {
     model: "gpt-5-nano",
     reasoningEffort: "low",
@@ -555,24 +613,33 @@ describe("chatWithOpenAI", () => {
   };
 
   beforeAll(() => {
-    global.fetch = mockFetch;
+    // Mock chrome.runtime.sendMessage
+    (global as any).chrome = {
+      runtime: {
+        sendMessage: mockSendMessage,
+        lastError: null,
+      },
+    };
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockEnsureApiKey.mockResolvedValue("sk-test-key");
+    (global as any).chrome.runtime.lastError = null;
   });
 
   test("calls OpenAI with conversation history", async () => {
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      json: jest.fn().mockResolvedValue({
-        status: "completed",
-        output_text: "Chat response",
-      }),
-    };
-    mockFetch.mockResolvedValue(mockResponse);
+    // Mock background script success response
+    mockSendMessage.mockImplementation((message, callback) => {
+      if (message.type === "OPENAI_REQUEST") {
+        callback({
+          success: true,
+          text: "Chat response",
+          responseTime: 1.0,
+          tokenUsage: null,
+        });
+      }
+    });
 
     const history: Message[] = [
       { id: "1", role: "user", text: "Question 1" },
@@ -589,29 +656,31 @@ describe("chatWithOpenAI", () => {
     );
 
     expect(result.text).toBe("Chat response");
-    const callArgs = mockFetch.mock.calls[0];
-    const body = JSON.parse(callArgs[1].body);
-    expect(body.input).toContain("Page text");
-    expect(body.input).toContain("Question 1");
-    expect(body.input).toContain("Answer 1");
+    const callArgs = mockSendMessage.mock.calls[0];
+    const payload = callArgs[0].payload;
+    expect(payload.input).toContain("Page text");
+    expect(payload.input).toContain("Question 1");
+    expect(payload.input).toContain("Answer 1");
   });
 
   test("handles empty conversation history", async () => {
-    const mockResponse = {
-      ok: true,
-      status: 200,
-      json: jest.fn().mockResolvedValue({
-        status: "completed",
-        output_text: "Response",
-      }),
-    };
-    mockFetch.mockResolvedValue(mockResponse);
+    // Mock background script success response
+    mockSendMessage.mockImplementation((message, callback) => {
+      if (message.type === "OPENAI_REQUEST") {
+        callback({
+          success: true,
+          text: "Response",
+          responseTime: 1.0,
+          tokenUsage: null,
+        });
+      }
+    });
 
     const result = await chatWithOpenAI("Page text", [], false, "", "default", defaultModelSettings);
     expect(result.text).toBe("Response");
 
-    const callArgs = mockFetch.mock.calls[0];
-    const body = JSON.parse(callArgs[1].body);
-    expect(body.input).toContain("(No prior conversation.)");
+    const callArgs = mockSendMessage.mock.calls[0];
+    const payload = callArgs[0].payload;
+    expect(payload.input).toContain("(No prior conversation.)");
   });
 });

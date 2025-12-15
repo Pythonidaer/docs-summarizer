@@ -4,6 +4,7 @@ export function createHeader(): {
   header: HTMLDivElement;
   closeButton: HTMLButtonElement;
   deleteKeyButton: HTMLButtonElement;
+  infoButton: HTMLButtonElement;
 } {
   const header = document.createElement("div");
   Object.assign(header.style, {
@@ -16,7 +17,15 @@ export function createHeader(): {
     borderBottom: "1px solid rgba(255,255,255,0.12)",
   } as CSSStyleDeclaration);
 
-  // Delete Key button (left side) - red text and border, pill-shaped like Summarize button
+  // Container for Delete Key button and Info icon (left side)
+  const leftContainer = document.createElement("div");
+  Object.assign(leftContainer.style, {
+    display: "flex",
+    alignItems: "center",
+    gap: CURSOR_SPACING.sm, // Gap between Delete Key and Info icon
+  } as CSSStyleDeclaration);
+
+  // Delete Key button - red text and border, pill-shaped like Summarize button
   const deleteKeyButton = document.createElement("button");
   deleteKeyButton.textContent = "Delete Key";
   Object.assign(deleteKeyButton.style, {
@@ -38,6 +47,69 @@ export function createHeader(): {
     deleteKeyButton.style.background = "transparent";
     deleteKeyButton.style.borderColor = "#ef4444"; // Return to default red
   });
+
+  // Info icon button (to the right of Delete Key)
+  const infoButton = document.createElement("button");
+  infoButton.title = "Security & Privacy Information";
+  Object.assign(infoButton.style, {
+    border: "none",
+    background: "transparent",
+    color: CURSOR_COLORS.textPrimary, // Brighter/lighter for better visibility
+    cursor: "pointer",
+    width: "20px",
+    height: "20px",
+    padding: "0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "color 0.2s",
+    opacity: "0.9", // Slightly brighter
+  } as CSSStyleDeclaration);
+
+  // Create info icon SVG (circle with "i")
+  const infoSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  infoSvg.setAttribute("width", "16");
+  infoSvg.setAttribute("height", "16");
+  infoSvg.setAttribute("viewBox", "0 0 24 24");
+  infoSvg.setAttribute("fill", "none");
+  infoSvg.setAttribute("stroke", "currentColor");
+  infoSvg.setAttribute("stroke-width", "2");
+  infoSvg.setAttribute("stroke-linecap", "round");
+  infoSvg.setAttribute("stroke-linejoin", "round");
+  
+  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  circle.setAttribute("cx", "12");
+  circle.setAttribute("cy", "12");
+  circle.setAttribute("r", "10");
+  
+  const line1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  line1.setAttribute("x1", "12");
+  line1.setAttribute("y1", "16");
+  line1.setAttribute("x2", "12");
+  line1.setAttribute("y2", "12");
+  
+  const line2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  line2.setAttribute("x1", "12");
+  line2.setAttribute("y1", "8");
+  line2.setAttribute("x2", "12.01");
+  line2.setAttribute("y2", "8");
+  
+  infoSvg.appendChild(circle);
+  infoSvg.appendChild(line1);
+  infoSvg.appendChild(line2);
+  infoButton.appendChild(infoSvg);
+
+  infoButton.addEventListener("mouseenter", () => {
+    infoButton.style.color = CURSOR_COLORS.textPrimary;
+    infoButton.style.opacity = "1";
+  });
+  infoButton.addEventListener("mouseleave", () => {
+    infoButton.style.color = CURSOR_COLORS.textPrimary;
+    infoButton.style.opacity = "0.9";
+  });
+
+  leftContainer.appendChild(deleteKeyButton);
+  leftContainer.appendChild(infoButton);
 
   const closeButton = document.createElement("button");
   closeButton.textContent = "×";
@@ -66,8 +138,8 @@ export function createHeader(): {
     closeButton.style.background = CURSOR_COLORS.buttonSecondary; // Return to default
   });
 
-  header.appendChild(deleteKeyButton);
+  header.appendChild(leftContainer);
   header.appendChild(closeButton);
 
-  return { header, closeButton, deleteKeyButton };
+  return { header, closeButton, deleteKeyButton, infoButton };
 }

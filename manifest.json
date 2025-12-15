@@ -5,21 +5,13 @@
   "description": "Proof-of-concept extension to summarize documentation pages.",
   "permissions": ["activeTab", "scripting", "storage"],
   "optional_permissions": ["bookmarks"],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": [],
   "action": {
     "default_title": "Docs Summarizer"
   },
   "background": {
     "service_worker": "dist/extension/background.js"
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["dist/extension/content-script.js"],
-      "run_at": "document_end",
-      "all_frames": false
-    }
-  ],
   "web_accessible_resources": [
     {
       "resources": ["detached-window.html"],

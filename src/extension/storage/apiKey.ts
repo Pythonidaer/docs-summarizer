@@ -4,7 +4,7 @@ import { showPrompt, showAlert } from "../ui/modal";
 
 async function getApiKey(): Promise<string | null> {
     return new Promise((resolve) => {
-        chrome.storage.sync.get(["openaiApiKey"], (result: {openaiApiKey?: string}) => {
+        chrome.storage.local.get(["openaiApiKey"], (result: {openaiApiKey?: string}) => {
             // Explicitly coerce undefined -> null
             resolve(result.openaiApiKey ?? null);
         });
@@ -13,14 +13,14 @@ async function getApiKey(): Promise<string | null> {
 
 async function setApiKey(key: string): Promise<void> {
     return new Promise((resolve) => {
-        chrome.storage.sync.set({ openaiApiKey: key }, () => resolve());
+        chrome.storage.local.set({ openaiApiKey: key }, () => resolve());
     });
 }
 
 // Delete API key from storage
 export async function deleteApiKey(): Promise<void> {
     return new Promise((resolve) => {
-        chrome.storage.sync.remove(["openaiApiKey"], () => resolve());
+        chrome.storage.local.remove(["openaiApiKey"], () => resolve());
     });
 }
 
@@ -30,8 +30,9 @@ export async function ensureApiKey(): Promise<string | null> {
     if (existing) return existing;
 
     const entered = await showPrompt(
-        "Enter your OpenAI API key (will be stored in Chrome for this extension only):",
-        "sk-..."
+        "Docs Summarizer helps you quickly understand documentation pages by providing AI-powered summaries and answering your questions about the content.\n\nTo get started, paste your OpenAI API key into the input below:\n\n⚠️ **Security Notice**: Your key will be stored locally in Chrome for this extension only, and is only sent to OpenAI's API. You can always access security information by clicking the info icon next to the \"Delete Key\" button.",
+        "sk-...",
+        "Welcome to Docs Summarizer"
     );
     
     if (!entered || !entered.trim()) {

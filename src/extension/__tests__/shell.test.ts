@@ -59,7 +59,7 @@ describe("createDrawerShell", () => {
     // Arrow should be centered
     expect(handle.style.justifyContent).toBe("center");
     expect(handle.style.background).toBe("rgb(30, 30, 30)"); // CURSOR_COLORS.background (matches drawer)
-    expect(handle.style.color).toBe("rgb(204, 204, 204)"); // CURSOR_COLORS.textPrimary
+    expect(handle.style.color).toBe("rgb(240, 238, 233)"); // CURSOR_COLORS.textPrimary (#F0EEE9)
     expect(handle.style.cursor).toBe("pointer");
     expect(handle.style.pointerEvents).toBe("auto");
     expect(handle.style.zIndex).toBe("999999"); // Ensure visibility
@@ -76,7 +76,7 @@ describe("createDrawerShell", () => {
     expect(drawer.style.width).toBe("800px");
     expect(drawer.style.maxWidth).toBe("80vw");
     expect(drawer.style.background).toBe("rgb(30, 30, 30)");
-    expect(drawer.style.color).toBe("rgb(204, 204, 204)");
+    expect(drawer.style.color).toBe("rgb(240, 238, 233)"); // CURSOR_COLORS.textPrimary (#F0EEE9)
     expect(drawer.style.transform).toBe("translateX(100%)");
   });
 

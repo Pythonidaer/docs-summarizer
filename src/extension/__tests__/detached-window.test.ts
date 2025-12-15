@@ -46,6 +46,7 @@ jest.mock("../ui/header", () => ({
     header: document.createElement("div"),
     closeButton: document.createElement("button"),
     deleteKeyButton: document.createElement("button"),
+    infoButton: document.createElement("button"),
   })),
 }));
 

@@ -17,6 +17,30 @@ interface DetachedWindowState {
   pageUrl: string | null; // Store URL for fallback tab lookup
 }
 
+interface OpenAIRequestPayload {
+  input: string;
+  instructions: string;
+  modelSettings: {
+    model: string;
+    reasoningEffort: string;
+    verbosity: string;
+    maxOutputTokens: number;
+  };
+  mode: "summary" | "chat";
+  history?: any[]; // Optional history for error logging
+}
+
+interface OpenAIResponse {
+  text: string;
+  responseTime: number;
+  tokenUsage: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    cost: number;
+  } | null;
+}
+
 let detachedWindowState: DetachedWindowState | null = null;
 let sourceTabId: number | null = null;
 
@@ -44,6 +68,22 @@ chrome.storage.local.get(['detachedWindowState', 'sourceTabId'], (result) => {
     sourceTabId = result.sourceTabId;
     console.log('[Docs Summarizer] Restored sourceTabId from storage:', sourceTabId);
   }
+});
+
+// Listen for extension icon click - inject content script only when user clicks
+chrome.action.onClicked.addListener((tab) => {
+  if (!tab.id) {
+    console.error('[Docs Summarizer] No tab ID available for injection');
+    return;
+  }
+
+  // Inject content script only when user clicks extension icon
+  chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ['dist/extension/content-script.js']
+  }).catch((error) => {
+    console.error('[Docs Summarizer] Failed to inject content script:', error);
+  });
 });
 
 // Listen for messages from content script
@@ -421,7 +461,434 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   }
+
+  if (message.type === 'OPENAI_REQUEST') {
+    // CRITICAL: Return true immediately to keep channel open for async response
+    handleOpenAIRequest(message.payload as OpenAIRequestPayload, sendResponse);
+    return true;
+  }
 });
+
+// ========== OpenAI API Handler (runs in background/service worker) ==========
+//
+// SECURITY NOTES:
+// - API key is ONLY accessed in this background script
+// - API key is NEVER logged, sent in messages, or exposed to content scripts
+// - Response/request objects are NEVER logged directly (they contain headers)
+// - All logging uses sanitizeForLogging() to prevent accidental exposure
+// - Error logging uses safeLogError() to prevent sensitive data leaks
+
+// Pricing constants (must match constants.ts)
+const GPT5_NANO_PRICING = {
+  input: 0.05, // $0.05 per 1M input tokens
+  output: 0.40, // $0.40 per 1M output tokens
+};
+
+/**
+ * Sanitizes an object for safe logging by removing sensitive fields.
+ * NEVER logs API keys, authorization headers, or other sensitive data.
+ */
+function sanitizeForLogging(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeForLogging(item));
+  }
+
+  const sanitized: any = {};
+  const sensitiveKeys = [
+    'apiKey',
+    'api_key',
+    'openaiApiKey',
+    'authorization',
+    'Authorization',
+    'bearer',
+    'Bearer',
+    'token',
+    'secret',
+    'password',
+    'headers', // Never log headers as they may contain Authorization
+  ];
+
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const lowerKey = key.toLowerCase();
+      const isSensitive = sensitiveKeys.some(sensitive => 
+        lowerKey.includes(sensitive.toLowerCase())
+      );
+
+      if (isSensitive) {
+        sanitized[key] = '[REDACTED]';
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        // Recursively sanitize nested objects
+        sanitized[key] = sanitizeForLogging(obj[key]);
+      } else {
+        sanitized[key] = obj[key];
+      }
+    }
+  }
+
+  return sanitized;
+}
+
+/**
+ * Safely logs an error without exposing sensitive data.
+ * NEVER logs API keys, authorization headers, or request/response objects directly.
+ */
+function safeLogError(message: string, error: any): void {
+  // Convert error to a safe object
+  const errorObj: any = {
+    message: error?.message || String(error),
+    name: error?.name,
+    stack: error?.stack,
+  };
+
+  // Sanitize before logging
+  const sanitized = sanitizeForLogging(errorObj);
+  console.error(`[Docs Summarizer] ${message}`, sanitized);
+}
+
+/**
+ * Extracts token usage from OpenAI API response
+ */
+function extractTokenUsage(data: any): { inputTokens: number; outputTokens: number; totalTokens: number; cost: number } | null {
+  if (!data?.usage) {
+    return null;
+  }
+
+  const usage = data.usage;
+  
+  // Handle both naming conventions
+  const inputTokens = Math.max(0, usage.input_tokens ?? usage.prompt_tokens ?? 0);
+  const outputTokens = Math.max(0, usage.output_tokens ?? usage.completion_tokens ?? 0);
+  const totalTokens = usage.total_tokens ?? (inputTokens + outputTokens);
+
+  // Guard against negative or invalid values
+  if (totalTokens < 0 || (inputTokens === 0 && outputTokens === 0 && !usage.total_tokens)) {
+    return null;
+  }
+
+  // If we don't have both input and output, we can't calculate cost accurately
+  if (inputTokens === 0 && outputTokens === 0) {
+    return null;
+  }
+
+  const cost = calculateTokenCost(inputTokens, outputTokens);
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    cost,
+  };
+}
+
+/**
+ * Calculates cost in dollars for gpt-5-nano based on token usage
+ */
+function calculateTokenCost(inputTokens: number, outputTokens: number): number {
+  const inputCost = (inputTokens / 1_000_000) * GPT5_NANO_PRICING.input;
+  const outputCost = (outputTokens / 1_000_000) * GPT5_NANO_PRICING.output;
+  return inputCost + outputCost;
+}
+
+/**
+ * Extracts text from OpenAI API response
+ */
+function extractTextFromResponse(data: any): string {
+  // 1) Try convenience field if present
+  if (typeof data.output_text === "string" && data.output_text.trim()) {
+    return data.output_text.trim();
+  }
+
+  const outputs = data.output;
+  if (!Array.isArray(outputs)) return "";
+
+  // 2) Look through all output items for an output_text content block
+  for (const item of outputs) {
+    if (!item || !Array.isArray(item.content)) continue;
+
+    for (const piece of item.content) {
+      if (!piece) continue;
+
+      // Most common shape: { type: "output_text", text: "..." }
+      if (
+        (piece.type === "output_text" || piece.type === "output") &&
+        typeof piece.text === "string" &&
+        piece.text.trim()
+      ) {
+        return piece.text.trim();
+      }
+    }
+  }
+
+  return "";
+}
+
+/**
+ * Handles OpenAI API requests in the background/service worker
+ * This ensures the API key never exists in content script context
+ */
+async function handleOpenAIRequest(
+  payload: OpenAIRequestPayload,
+  sendResponse: (response: any) => void
+): Promise<void> {
+  try {
+    console.log('[Docs Summarizer] Background script received OPENAI_REQUEST');
+    
+    // Get API key from storage (never exposed to content script)
+    const storageResult = await new Promise<{ openaiApiKey?: string }>((resolve) => {
+      chrome.storage.local.get(["openaiApiKey"], (result) => {
+        resolve(result);
+      });
+    });
+
+    const apiKey = storageResult.openaiApiKey;
+    if (!apiKey) {
+      console.error('[Docs Summarizer] API key missing in background script');
+      sendResponse({ 
+        error: "API key missing",
+        errorType: "MISSING_API_KEY"
+      });
+      return;
+    }
+
+    // Debug logging: see exactly what we send (but NEVER log the API key)
+    console.groupCollapsed(
+      `[Docs Summarizer] Background script making OpenAI fetch (${payload.mode}) – ${new Date().toISOString()}`
+    );
+    console.log("Model settings", payload.modelSettings);
+    console.log("Instructions (first 1000 chars)", payload.instructions.slice(0, 1000));
+    console.log("Input (first 10000 chars)", payload.input.slice(0, 10000));
+    console.log("Fetch URL: https://api.openai.com/v1/responses");
+    console.log("Initiator: chrome-extension:// (background/service worker)");
+    console.groupEnd();
+
+    // Track response time
+    const startTime = performance.now();
+
+    console.log('[Docs Summarizer] Background script calling fetch to https://api.openai.com/v1/responses');
+    console.log('[Docs Summarizer] This fetch is initiated by the service worker (background script)');
+    console.log('[Docs Summarizer] Service Worker context:', typeof self !== 'undefined' ? 'Service Worker' : 'Unknown');
+    console.log('[Docs Summarizer] Chrome extension ID:', chrome.runtime.id);
+    
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`, // API key is NEVER logged
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: payload.modelSettings.model,
+        instructions: payload.instructions,
+        input: payload.input,
+        max_output_tokens: payload.modelSettings.maxOutputTokens,
+        reasoning: { effort: payload.modelSettings.reasoningEffort },
+        text: {
+          verbosity: payload.modelSettings.verbosity,
+        },
+      }),
+    });
+
+    const endTime = performance.now();
+    const responseTime = (endTime - startTime) / 1000; // Convert to seconds
+
+    // SAFETY: Only log response.status, never the response object itself (contains headers with Authorization)
+    console.log('[Docs Summarizer] Background script received fetch response, status:', response.status);
+
+    const status = response.status;
+    let data: any;
+
+    try {
+      data = await response.json();
+    } catch (e) {
+      // SAFETY: Never log the response object directly as it may contain headers
+      safeLogError("Failed to parse OpenAI JSON", e);
+      sendResponse({ 
+        error: `OpenAI error (invalid JSON, status ${status})`,
+        errorType: "PARSE_ERROR"
+      });
+      return;
+    }
+
+    // Always expand logs for errors, collapse for success
+    const logGroup = (data?.status !== "completed" || data?.error)
+      ? console.group  // Always expanded for errors
+      : console.groupCollapsed; // Collapsed for success
+
+    logGroup(
+      `[Docs Summarizer] OpenAI response (${payload.mode}) – status ${status}`
+    );
+    // SAFETY: Only log response body data, never the response object itself (which contains headers)
+    // The response body (data) does not contain the API key or authorization headers
+    console.log("Raw response JSON", sanitizeForLogging(data));
+    console.log("response.status field", data?.status);
+    console.log("response.incomplete_details", data?.incomplete_details);
+    console.log("response.error", data?.error);
+    console.log("response.usage", data?.usage);
+    
+    // If incomplete or error, also log what we sent (but NEVER the API key)
+    if (data?.status !== "completed" || data?.error) {
+      console.log("Input length:", payload.input.length, "chars");
+      console.log("Instructions length:", payload.instructions.length, "chars");
+      console.log("Full input sent (last 2000 chars):", payload.input.slice(-2000));
+      console.log("Full instructions sent (last 1000 chars):", payload.instructions.slice(-1000));
+      
+      // For content_filter specifically
+      if (data?.incomplete_details?.reason === "content_filter" && payload.input.includes("=== PAGE CONTENT ===")) {
+        const pageContentMatch = payload.input.match(/=== PAGE CONTENT[^=]*===\s*\n([\s\S]*?)\n\n=== CONVERSATION/);
+        if (pageContentMatch && pageContentMatch[1]) {
+          console.log("Page content length:", pageContentMatch[1].length, "chars");
+          console.log("Page content preview (first 500 chars):", pageContentMatch[1].slice(0, 500));
+        }
+      }
+    }
+    
+    console.groupEnd();
+
+    // HTTP-level error
+    if (!response.ok) {
+      const msg =
+        data?.error?.message ??
+        data?.error ??
+        `HTTP ${status}`;
+      sendResponse({ 
+        error: `OpenAI error: ${msg}`,
+        errorType: "HTTP_ERROR"
+      });
+      return;
+    }
+
+    // API-level error inside JSON
+    if (data?.error) {
+      const msg =
+        data.error.message ??
+        data.error.type ??
+        JSON.stringify(data.error);
+      sendResponse({ 
+        error: `OpenAI error: ${msg}`,
+        errorType: "API_ERROR"
+      });
+      return;
+    }
+
+    // Responses API status field (completed / incomplete / failed / cancelled)
+    if (data?.status && data.status !== "completed") {
+      // Try to extract any partial text that was generated before the filter triggered
+      let partialText = "";
+      try {
+        partialText = extractTextFromResponse(data) || "";
+      } catch (e) {
+        // Ignore extraction errors
+      }
+      
+      const tokenUsage = extractTokenUsage(data);
+      let tokenInfo = "";
+      
+      if (data?.incomplete_details?.reason === "max_tokens" || data?.status === "incomplete") {
+        if (tokenUsage) {
+          tokenInfo = ` (Used ${tokenUsage.totalTokens.toLocaleString()} tokens, max was ${payload.modelSettings.maxOutputTokens?.toLocaleString() || payload.modelSettings.maxOutputTokens})`;
+        } else if (data?.usage?.total_tokens) {
+          const totalTokens = Math.max(0, data.usage.total_tokens);
+          tokenInfo = ` (Used ${totalTokens.toLocaleString()} tokens, max was ${payload.modelSettings.maxOutputTokens?.toLocaleString() || payload.modelSettings.maxOutputTokens})`;
+        } else {
+          tokenInfo = ` (Max tokens: ${payload.modelSettings.maxOutputTokens?.toLocaleString() || payload.modelSettings.maxOutputTokens})`;
+        }
+      }
+      
+      // Enhanced logging for content_filter errors
+      if (data?.incomplete_details?.reason === "content_filter") {
+        console.error("[Docs Summarizer] ⚠️ CONTENT FILTER TRIGGERED ⚠️");
+        console.error("Partial response text (before filter):", partialText || "(no partial text available)");
+        console.error("Partial text length:", partialText.length, "chars");
+        if (partialText) {
+          console.error("First 500 chars of partial response:", partialText.slice(0, 500));
+          console.error("Last 500 chars of partial response:", partialText.slice(-500));
+        }
+        console.error("Full incomplete_details:", JSON.stringify(sanitizeForLogging(data.incomplete_details), null, 2));
+        // SAFETY: Sanitize response data before logging to ensure no sensitive info leaks
+        console.error("Full response data:", JSON.stringify(sanitizeForLogging(data), null, 2));
+        
+        // Log the input that was sent (but NEVER the API key)
+        console.error("=== FULL INPUT SENT (for content_filter analysis) ===");
+        console.error("Input length:", payload.input.length, "chars");
+        console.error("Full input:", payload.input);
+        console.error("=== FULL INSTRUCTIONS SENT ===");
+        console.error("Instructions length:", payload.instructions.length, "chars");
+        console.error("Full instructions:", payload.instructions);
+        
+        // Also log just the user's most recent message if we can extract it
+        if (payload.input.includes("User:") || payload.input.includes("=== CONVERSATION SO FAR ===")) {
+          const userMsgMatch = payload.input.match(/User:\s*([^\n]+(?:\n(?!User:|Assistant:)[^\n]+)*)/);
+          if (userMsgMatch && userMsgMatch[1]) {
+            console.error("=== USER'S MOST RECENT MESSAGE ===");
+            console.error(userMsgMatch[1]);
+          }
+        }
+        
+        // Log conversation history if available
+        if (payload.mode === "chat" && payload.history) {
+          if (payload.history.length > 0) {
+            console.error("Conversation history (last 5 messages):");
+            payload.history.slice(-5).forEach((msg: any, i: number) => {
+              const preview = msg.text.slice(0, 300);
+              console.error(`  [${i}] ${msg.role}: ${preview}${msg.text.length > 300 ? '...' : ''}`);
+            });
+            console.error("Total messages in history:", payload.history.length);
+          }
+        }
+      }
+      
+      const details = data?.incomplete_details
+        ? ` – details: ${JSON.stringify(data.incomplete_details)}`
+        : "";
+      
+      // Include partial text in error message if available
+      const partialTextInfo = partialText 
+        ? `\n\n⚠️ Partial response before filter (${partialText.length} chars): "${partialText.slice(0, 200)}${partialText.length > 200 ? '...' : ''}"`
+        : "";
+      
+      sendResponse({ 
+        error: `OpenAI response not completed (status: ${data.status})${tokenInfo}${details}${partialTextInfo}`,
+        errorType: "INCOMPLETE_RESPONSE"
+      });
+      return;
+    }
+
+    const summaryText = extractTextFromResponse(data);
+
+    if (!summaryText || !summaryText.trim()) {
+      sendResponse({ 
+        error: "The model returned an empty response (no text blocks found). Try reducing the amount of page text or adjusting instructions.",
+        errorType: "EMPTY_RESPONSE"
+      });
+      return;
+    }
+
+    // Extract token usage
+    const tokenUsage = extractTokenUsage(data);
+
+    sendResponse({
+      success: true,
+      text: summaryText,
+      responseTime,
+      tokenUsage,
+    });
+  } catch (error: any) {
+    // SAFETY: Use safeLogError to prevent logging sensitive data
+    safeLogError("Background OpenAI request error", error);
+    sendResponse({ 
+      error: error?.message || String(error),
+      errorType: "UNKNOWN_ERROR"
+    });
+  }
+}
 
 // Clean up when detached window closes
 chrome.windows.onRemoved.addListener((windowId) => {

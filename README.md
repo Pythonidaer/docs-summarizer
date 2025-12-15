@@ -100,9 +100,60 @@ npm test
 
 ### 6. First Run (API Key Prompt)
 
-The extension stores your OpenAI key in `chrome.storage.sync` under
+The extension stores your OpenAI key in `chrome.storage.local` under
 `openaiApiKey`.\
 You will be prompted automatically when first needed.
+
+## Security & Privacy
+
+### API Key Storage
+
+Your OpenAI API key is stored locally in Chrome's `chrome.storage.local` under the key `openaiApiKey`. This means:
+
+- **Local storage only**: The key is stored on your computer only, not synced across devices
+- **Extension-only access**: Only this extension can access the key
+- **No external transmission**: The key is never sent to any servers except OpenAI's API (`https://api.openai.com`)
+- **No logging**: The key is never logged in console output or error messages
+
+### Security Risks
+
+While we take security seriously, you should be aware of these risks:
+
+- If your computer is compromised, the key could be accessed
+- Anyone with access to your Chrome storage could use your key
+- The key has access to your OpenAI account and billing
+- The extension only sends the key to OpenAI's API (never to other servers)
+
+### Security Best Practices
+
+- **Use spending limits**: If you want to be super cautious, consider using a throwaway API key with spending limits for this extension
+  - Go to [OpenAI Dashboard → Billing](https://platform.openai.com/account/billing) → Set usage limits
+  - Create a separate API key for this extension
+  - Set a monthly spending cap
+- **Regular key rotation**: Regularly rotate your API keys
+- **Revoke compromised keys**: If your computer is compromised, immediately revoke the key at [OpenAI API Keys](https://platform.openai.com/api-keys)
+- **Never share your key**: Keep your API key private
+
+### How to Delete Your API Key
+
+1. Click the "Delete Key" button in the extension header
+2. Or manually: Chrome DevTools → Application → Storage → Local Storage → Extension ID → Delete `openaiApiKey`
+
+### Privacy
+
+**Important**: The extension creator does NOT store your data. Your API key and all data are stored locally on your computer only. The extension creator has no access to your API key, your OpenAI account, or any data you process with this extension.
+
+This extension:
+- Stores your API key locally in Chrome storage only
+- Sends your API key ONLY to OpenAI's API
+- Never sends your key to any other servers
+- Never logs your API key
+- Processes page content locally before sending to OpenAI
+- Does not collect or store any personal data
+
+Your API key is used solely to authenticate requests to OpenAI's API. We do not have access to your key or your OpenAI account.
+
+You can access the Security & Privacy FAQ at any time by clicking the info icon (ℹ️) next to the "Delete Key" button in the extension header.
 
 ## Project Structure
 

@@ -19,7 +19,7 @@ import { createMainArea } from "./ui/mainArea";
 import { DRAWER_STYLE_CSS, GLOBAL_HIGHLIGHT_STYLE_CSS, LOADING_ANIMATION_CSS, MODAL_ANIMATION_CSS } from "./ui/styles";
 import { setPageTextForLinks } from "./pageText";
 import { clearAllHighlights, scrollToPageMatch } from "./highlight";
-import { showAlert, showModal } from "./ui/modal";
+import { showAlert, showModal, showSecurityFAQ } from "./ui/modal";
 import { deleteApiKey } from "./storage/apiKey";
 import type { PromptVoiceId } from "./prompts/voices";
 import { wireDrawerEvents } from "./ui/events";
@@ -263,7 +263,12 @@ function createDrawerUI(): void {
   style.textContent = DRAWER_STYLE_CSS + LOADING_ANIMATION_CSS + MODAL_ANIMATION_CSS;
 
   // Header
-  const { header, closeButton, deleteKeyButton } = createHeader();
+  const { header, closeButton, deleteKeyButton, infoButton } = createHeader();
+  
+  // Info button handler
+  infoButton.addEventListener("click", () => {
+    showSecurityFAQ();
+  });
   
   // Delete Key button handler
   deleteKeyButton.addEventListener("click", () => {

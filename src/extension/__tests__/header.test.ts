@@ -3,14 +3,16 @@
 import { createHeader } from "../ui/header";
 
 describe("createHeader", () => {
-  test("creates header with delete key button and close button", () => {
-    const { header, closeButton, deleteKeyButton } = createHeader();
+  test("creates header with delete key button, info button, and close button", () => {
+    const { header, closeButton, deleteKeyButton, infoButton } = createHeader();
 
     expect(header).toBeInstanceOf(HTMLDivElement);
     expect(closeButton).toBeInstanceOf(HTMLButtonElement);
     expect(deleteKeyButton).toBeInstanceOf(HTMLButtonElement);
+    expect(infoButton).toBeInstanceOf(HTMLButtonElement);
     expect(header.contains(closeButton)).toBe(true);
     expect(header.contains(deleteKeyButton)).toBe(true);
+    expect(header.contains(infoButton)).toBe(true);
   });
 
   test("header has correct styling", () => {
@@ -25,15 +27,18 @@ describe("createHeader", () => {
     expect(header.style.borderBottom).toMatch(/rgba\(255,\s*255,\s*255,\s*0\.12\)/);
   });
 
-  test("header contains delete key button and close button", () => {
-    const { header, deleteKeyButton, closeButton } = createHeader();
+  test("header contains delete key button, info button, and close button", () => {
+    const { header, deleteKeyButton, infoButton, closeButton } = createHeader();
 
-    // Should have both buttons
+    // Should have left container and close button (2 children)
     expect(header.children.length).toBe(2);
     expect(header.contains(deleteKeyButton)).toBe(true);
+    expect(header.contains(infoButton)).toBe(true);
     expect(header.contains(closeButton)).toBe(true);
-    // Delete key button should be first (left side)
-    expect(header.children[0]).toBe(deleteKeyButton);
+    // Left container should be first (contains delete key and info buttons)
+    const leftContainer = header.children[0] as HTMLElement;
+    expect(leftContainer.contains(deleteKeyButton)).toBe(true);
+    expect(leftContainer.contains(infoButton)).toBe(true);
     // Close button should be second (right side)
     expect(header.children[1]).toBe(closeButton);
   });
@@ -46,7 +51,7 @@ describe("createHeader", () => {
     expect(closeButton.style.border === "none" || closeButton.style.border === "").toBe(true);
     // Close button now has circular background (always visible)
     expect(closeButton.style.background).toBe("rgb(60, 60, 60)"); // CURSOR_COLORS.buttonSecondary
-    expect(closeButton.style.color).toBe("rgb(204, 204, 204)"); // CURSOR_COLORS.textPrimary
+    expect(closeButton.style.color).toBe("rgb(240, 238, 233)"); // CURSOR_COLORS.textPrimary (#F0EEE9)
     expect(closeButton.style.cursor).toBe("pointer");
     expect(closeButton.style.fontSize).toBe("18px");
     // marginLeft removed since we use space-between layout
@@ -66,6 +71,16 @@ describe("createHeader", () => {
     expect(deleteKeyButton.style.borderRadius).toBe("9999px"); // Pill-shaped like Summarize button
     expect(deleteKeyButton.style.cursor).toBe("pointer");
     expect(deleteKeyButton.style.background).toBe("transparent");
+  });
+
+  test("info button has correct styling and contains SVG icon", () => {
+    const { infoButton } = createHeader();
+
+    expect(infoButton.title).toBe("Security & Privacy Information");
+    expect(infoButton.style.cursor).toBe("pointer");
+    expect(infoButton.style.width).toBe("20px");
+    expect(infoButton.style.height).toBe("20px");
+    expect(infoButton.querySelector("svg")).toBeInstanceOf(SVGElement);
   });
 
   test("close button is clickable", () => {
