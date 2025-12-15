@@ -1,420 +1,170 @@
 // src/extension/ui/bookmarks.ts
-// Bookmarks tree visualization UI
+// Utilities for rendering bookmarks in messages
 
-import { CURSOR_COLORS, CURSOR_SPACING, CURSOR_BORDERS, CURSOR_TYPOGRAPHY } from "./design";
-import {
-  getBookmarksWithPaths,
-  getFaviconUrl,
-  hasBookmarksPermission,
-  requestBookmarksPermission,
-  type BookmarkInfo,
-} from "../storage/bookmarks";
-
-export interface BookmarksPanelElements {
-  panel: HTMLDivElement;
-  closeButton: HTMLButtonElement;
-}
+import type { BookmarkInfo } from "../storage/bookmarks";
 
 /**
- * Creates a bookmarks panel with tree structure visualization
+ * @deprecated This function is no longer used. Bookmarks are now rendered inline in messages.
+ * Kept for backward compatibility with tests.
  */
-export function createBookmarksPanel(): BookmarksPanelElements {
+export function createBookmarksPanel(): { panel: HTMLDivElement; closeButton: HTMLButtonElement } {
   const panel = document.createElement("div");
-  Object.assign(panel.style, {
-    position: "fixed",
-    top: "0",
-    left: "0",
-    width: "100%",
-    height: "100%",
-    background: "rgba(0, 0, 0, 0.6)",
-    backdropFilter: "blur(2px)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: "1000000",
-    fontFamily: CURSOR_TYPOGRAPHY.fontFamily,
-  } as CSSStyleDeclaration);
-
-  const container = document.createElement("div");
-  Object.assign(container.style, {
-    background: CURSOR_COLORS.backgroundSecondary,
-    borderRadius: CURSOR_BORDERS.radius.md,
-    border: `${CURSOR_BORDERS.width.thin} solid ${CURSOR_COLORS.border}`,
-    width: "80%",
-    maxWidth: "800px",
-    maxHeight: "80vh",
-    display: "flex",
-    flexDirection: "column",
-    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
-  } as CSSStyleDeclaration);
-
-  // Header
-  const header = document.createElement("div");
-  Object.assign(header.style, {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: CURSOR_SPACING.xl,
-    borderBottom: `${CURSOR_BORDERS.width.thin} solid ${CURSOR_COLORS.border}`,
-  } as CSSStyleDeclaration);
-
-  const title = document.createElement("div");
-  title.textContent = "Bookmarks";
-  Object.assign(title.style, {
-    fontSize: CURSOR_TYPOGRAPHY.fontSize.lg,
-    fontWeight: CURSOR_TYPOGRAPHY.fontWeight.semibold,
-    color: CURSOR_COLORS.textPrimary,
-  } as CSSStyleDeclaration);
-
   const closeButton = document.createElement("button");
-  closeButton.textContent = "×";
-  closeButton.title = "Close";
-  Object.assign(closeButton.style, {
-    background: "transparent",
-    border: "none",
-    color: CURSOR_COLORS.textPrimary,
-    fontSize: "24px",
-    cursor: "pointer",
-    padding: "0",
-    width: "24px",
-    height: "24px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    lineHeight: "1",
-  } as CSSStyleDeclaration);
-
-  closeButton.addEventListener("click", () => {
-    panel.remove();
-  });
-
-  header.appendChild(title);
-  header.appendChild(closeButton);
-
-  // Content area
-  const content = document.createElement("div");
-  Object.assign(content.style, {
-    padding: CURSOR_SPACING.xl,
-    overflowY: "auto",
-    flex: "1",
-  } as CSSStyleDeclaration);
-
-  // Loading state
-  const loading = document.createElement("div");
-  loading.textContent = "Loading bookmarks...";
-  Object.assign(loading.style, {
-    color: CURSOR_COLORS.textSecondary,
-    fontSize: CURSOR_TYPOGRAPHY.fontSize.base,
-  } as CSSStyleDeclaration);
-  content.appendChild(loading);
-
-  container.appendChild(header);
-  container.appendChild(content);
-  panel.appendChild(container);
-
-  // Load and render bookmarks
-  loadAndRenderBookmarks(content);
-
-  // Close on ESC
-  const handleEsc = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      panel.remove();
-      document.removeEventListener("keydown", handleEsc);
-    }
-  };
-  document.addEventListener("keydown", handleEsc);
-
-  // Close on overlay click
-  panel.addEventListener("click", (e) => {
-    if (e.target === panel) {
-      panel.remove();
-    }
-  });
-
   return { panel, closeButton };
 }
 
 /**
- * Loads bookmarks and renders them in tree format
+ * @deprecated This function is no longer used. Bookmarks are now rendered inline in messages.
+ * Kept for backward compatibility with tests.
  */
-async function loadAndRenderBookmarks(container: HTMLElement): Promise<void> {
-  try {
-    // Check if we have permission first
-    const hasPermission = await hasBookmarksPermission();
-    
-    if (!hasPermission) {
-      container.innerHTML = "";
-      const permissionDiv = document.createElement("div");
-      permissionDiv.innerHTML = `
-        <div style="padding: ${CURSOR_SPACING.xl};">
-          <div style="margin-bottom: ${CURSOR_SPACING.lg}; color: ${CURSOR_COLORS.textPrimary}; font-size: ${CURSOR_TYPOGRAPHY.fontSize.base}; text-align: center;">
-            Bookmarks permission is required to view your bookmarks.
-          </div>
-          <div style="text-align: center; margin-bottom: ${CURSOR_SPACING.lg};">
-            <button id="request-bookmarks-permission" style="
-              padding: ${CURSOR_SPACING.md} ${CURSOR_SPACING.xl};
-              font-size: ${CURSOR_TYPOGRAPHY.fontSize.base};
-              border-radius: ${CURSOR_BORDERS.radius.md};
-              border: ${CURSOR_BORDERS.width.thin} solid ${CURSOR_COLORS.border};
-              background: ${CURSOR_COLORS.buttonPrimary};
-              color: ${CURSOR_COLORS.textPrimary};
-              cursor: pointer;
-              transition: background-color 0.2s;
-              font-family: ${CURSOR_TYPOGRAPHY.fontFamily};
-            ">
-              Grant Bookmarks Permission
-            </button>
-          </div>
-          <div style="
-            padding: ${CURSOR_SPACING.md};
-            background: ${CURSOR_COLORS.backgroundTertiary};
-            border-radius: ${CURSOR_BORDERS.radius.sm};
-            font-size: ${CURSOR_TYPOGRAPHY.fontSize.sm};
-            color: ${CURSOR_COLORS.textSecondary};
-            line-height: ${CURSOR_TYPOGRAPHY.lineHeight.relaxed};
-          ">
-            <strong>If the permission dialog doesn't appear:</strong><br>
-            1. Go to <code style="background: ${CURSOR_COLORS.backgroundSecondary}; padding: 2px 4px; border-radius: 3px;">chrome://extensions</code><br>
-            2. Find "Docs Summarizer POC" and click <strong>Details</strong><br>
-            3. Under "Site access" or "Permissions", enable <strong>Bookmarks</strong><br>
-            4. Come back and try again
-          </div>
-        </div>
-      `;
-      container.appendChild(permissionDiv);
-
-      const requestBtn = document.getElementById("request-bookmarks-permission");
-      if (requestBtn) {
-        let isRequesting = false;
-        requestBtn.addEventListener("click", async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          if (isRequesting) return; // Prevent double-clicks
-          isRequesting = true;
-          
-          console.log("[Docs Summarizer] Permission request button clicked");
-          
-          // Update button text
-          (requestBtn as HTMLElement).textContent = "Requesting...";
-          (requestBtn as HTMLElement).style.opacity = "0.6";
-          (requestBtn as HTMLElement).style.cursor = "not-allowed";
-          
-          try {
-            // Small delay to ensure user gesture is captured
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            const granted = await requestBookmarksPermission();
-            console.log("[Docs Summarizer] Permission granted:", granted);
-            
-            if (granted) {
-              // Reload bookmarks
-              await loadAndRenderBookmarks(container);
-            } else {
-              // Remove any existing error messages
-              const existingError = container.querySelector(".permission-error");
-              if (existingError) existingError.remove();
-              
-              const errorMsg = document.createElement("div");
-              errorMsg.className = "permission-error";
-              errorMsg.innerHTML = `
-                <div style="color: #ff6b6b; margin-bottom: ${CURSOR_SPACING.sm};">
-                  Permission was denied or not granted.
-                </div>
-                <div style="color: ${CURSOR_COLORS.textSecondary}; font-size: ${CURSOR_TYPOGRAPHY.fontSize.sm};">
-                  You can manually grant the permission by:<br>
-                  1. Going to <code>chrome://extensions</code><br>
-                  2. Finding this extension<br>
-                  3. Clicking "Details"<br>
-                  4. Enabling "Bookmarks" under Site access
-                </div>
-              `;
-              Object.assign(errorMsg.style, {
-                marginTop: CURSOR_SPACING.md,
-                fontSize: CURSOR_TYPOGRAPHY.fontSize.sm,
-                padding: CURSOR_SPACING.md,
-                background: CURSOR_COLORS.backgroundTertiary,
-                borderRadius: CURSOR_BORDERS.radius.sm,
-                lineHeight: CURSOR_TYPOGRAPHY.lineHeight.relaxed,
-              } as CSSStyleDeclaration);
-              container.appendChild(errorMsg);
-              
-              // Reset button
-              (requestBtn as HTMLElement).textContent = "Try Again";
-              (requestBtn as HTMLElement).style.opacity = "1";
-              (requestBtn as HTMLElement).style.cursor = "pointer";
-            }
-          } catch (error) {
-            console.error("[Docs Summarizer] Error requesting permission:", error);
-            const errorMsg = document.createElement("div");
-            errorMsg.className = "permission-error";
-            errorMsg.textContent = `Error: ${error instanceof Error ? error.message : String(error)}. Check the console for details.`;
-            Object.assign(errorMsg.style, {
-              color: "#ff6b6b",
-              marginTop: CURSOR_SPACING.md,
-              fontSize: CURSOR_TYPOGRAPHY.fontSize.sm,
-              padding: CURSOR_SPACING.md,
-            } as CSSStyleDeclaration);
-            container.appendChild(errorMsg);
-            
-            // Reset button
-            (requestBtn as HTMLElement).textContent = "Try Again";
-            (requestBtn as HTMLElement).style.opacity = "1";
-            (requestBtn as HTMLElement).style.cursor = "pointer";
-          } finally {
-            isRequesting = false;
-          }
-        });
-
-        // Add hover effect
-        requestBtn.addEventListener("mouseenter", () => {
-          (requestBtn as HTMLElement).style.background = CURSOR_COLORS.buttonPrimaryHover;
-        });
-        requestBtn.addEventListener("mouseleave", () => {
-          (requestBtn as HTMLElement).style.background = CURSOR_COLORS.buttonPrimary;
-        });
-      }
-      return;
-    }
-
-    const bookmarks = await getBookmarksWithPaths();
-    container.innerHTML = "";
-
-    if (bookmarks.length === 0) {
-      const empty = document.createElement("div");
-      empty.textContent = "No bookmarks found";
-      Object.assign(empty.style, {
-        color: CURSOR_COLORS.textSecondary,
-        fontSize: CURSOR_TYPOGRAPHY.fontSize.base,
-      } as CSSStyleDeclaration);
-      container.appendChild(empty);
-      return;
-    }
-
-    // Group by top-level folder
-    const tree = buildTree(bookmarks);
-    renderTree(container, tree, 0);
-  } catch (error) {
-    container.innerHTML = "";
-    const errorDiv = document.createElement("div");
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    errorDiv.textContent = `Error loading bookmarks: ${errorMessage}`;
-    Object.assign(errorDiv.style, {
-      color: "#ff6b6b",
-      fontSize: CURSOR_TYPOGRAPHY.fontSize.base,
-      padding: CURSOR_SPACING.md,
-      lineHeight: CURSOR_TYPOGRAPHY.lineHeight.relaxed,
-    } as CSSStyleDeclaration);
-    container.appendChild(errorDiv);
-
-    // Check if it's a permission error and offer to request it
-    if (errorMessage.includes("permission") || errorMessage.includes("not available")) {
-      const requestBtn = document.createElement("button");
-      requestBtn.textContent = "Request Bookmarks Permission";
-      Object.assign(requestBtn.style, {
-        marginTop: CURSOR_SPACING.md,
-        padding: `${CURSOR_SPACING.sm} ${CURSOR_SPACING.md}`,
-        fontSize: CURSOR_TYPOGRAPHY.fontSize.sm,
-        borderRadius: CURSOR_BORDERS.radius.md,
-        border: `${CURSOR_BORDERS.width.thin} solid ${CURSOR_COLORS.border}`,
-        background: CURSOR_COLORS.buttonPrimary,
-        color: CURSOR_COLORS.textPrimary,
-        cursor: "pointer",
-        fontFamily: CURSOR_TYPOGRAPHY.fontFamily,
-      } as CSSStyleDeclaration);
-      
-      let isRequesting = false;
-      requestBtn.addEventListener("click", async () => {
-        if (isRequesting) return;
-        isRequesting = true;
-        
-        requestBtn.textContent = "Requesting...";
-        (requestBtn as HTMLElement).style.opacity = "0.6";
-        (requestBtn as HTMLElement).style.cursor = "not-allowed";
-        
-        try {
-          const granted = await requestBookmarksPermission();
-          if (granted) {
-            await loadAndRenderBookmarks(container);
-          } else {
-            errorDiv.textContent = "Permission was denied. Please grant the bookmarks permission to use this feature.";
-            requestBtn.textContent = "Request Bookmarks Permission";
-            (requestBtn as HTMLElement).style.opacity = "1";
-            (requestBtn as HTMLElement).style.cursor = "pointer";
-          }
-        } catch (error) {
-          errorDiv.textContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
-          requestBtn.textContent = "Request Bookmarks Permission";
-          (requestBtn as HTMLElement).style.opacity = "1";
-          (requestBtn as HTMLElement).style.cursor = "pointer";
-        } finally {
-          isRequesting = false;
-        }
-      });
-      
-      container.appendChild(requestBtn);
-    }
-  }
+export function showBookmarksPanel(): void {
+  // No-op: functionality moved to inline message rendering
 }
 
 /**
- * Builds a tree structure from flat bookmark list
+ * Builds a tree structure from bookmarks for collapsible rendering
+ * @param bookmarks - List of bookmarks to build tree from
+ * @param basePath - Optional base path representing the queried folder (shows folder itself, not just contents)
  */
-function buildTree(bookmarks: BookmarkInfo[]): Map<string, BookmarkInfo> {
+function buildBookmarkTreeForCollapsible(bookmarks: BookmarkInfo[], basePath: string[] = []): Map<string, BookmarkInfo> {
   const tree = new Map<string, BookmarkInfo>();
 
-  for (const bookmark of bookmarks) {
-    if (bookmark.folderPath.length === 0) continue;
+  // If a basePath is provided, we want to show the folder itself as a collapsible node
+  // All matching bookmarks become children of that folder
+  if (basePath.length > 0) {
+    const folderName = basePath[basePath.length - 1]!;
+    const folderNode: BookmarkInfo = {
+      id: `folder-${basePath.join("/")}`,
+      title: folderName,
+      folderPath: basePath,
+      children: [],
+    };
 
-    const topLevel = bookmark.folderPath[0];
-    if (!topLevel) continue;
-    
-    if (!tree.has(topLevel)) {
-      tree.set(topLevel, {
-        id: `folder-${topLevel}`,
-        title: topLevel,
-        folderPath: [topLevel],
-        children: [],
-      });
+    // Process all bookmarks that match the base path
+    for (const bookmark of bookmarks) {
+      // Skip folder nodes (nodes without URLs)
+      if (!bookmark.url) continue;
+      
+      // Check if the bookmark's path starts with the base path
+      if (bookmark.folderPath.length >= basePath.length) {
+        const matchesBase = basePath.every((seg, i) => bookmark.folderPath[i] === seg);
+        if (matchesBase) {
+          // Strip the base path to get relative path within the folder
+          const relativePath = bookmark.folderPath.slice(basePath.length);
+          
+          // If relative path is empty, bookmark is directly in the queried folder
+          if (relativePath.length === 0) {
+            if (!folderNode.children) {
+              folderNode.children = [];
+            }
+            folderNode.children.push(bookmark);
+          } else {
+            // Bookmark is in a subfolder - build nested structure
+            // The relativePath represents the folder structure, but the bookmark itself
+            // is directly in the folder at that path, so we need to create folders for all segments
+            if (!folderNode.children) {
+              folderNode.children = [];
+            }
+            
+            let current = folderNode;
+            // Create folders for all segments in the relative path
+            for (let i = 0; i < relativePath.length; i++) {
+              const segment = relativePath[i];
+              if (!segment) continue;
+              
+              if (!current.children) {
+                current.children = [];
+              }
+
+              // Look for existing folder node with matching title
+              let child = current.children.find((c) => !c.url && c.title === segment);
+              if (!child) {
+                // Create new folder node
+                const fullPath = [...basePath, ...relativePath.slice(0, i + 1)];
+                child = {
+                  id: `folder-${fullPath.join("/")}`,
+                  title: segment,
+                  folderPath: fullPath,
+                  children: [],
+                };
+                current.children.push(child);
+              }
+              current = child;
+            }
+            
+            // Add bookmark to the deepest folder (the folder it's directly in)
+            if (!current.children) {
+              current.children = [];
+            }
+            current.children.push(bookmark);
+          }
+        }
+      }
     }
 
-    const folder = tree.get(topLevel);
-    if (!folder) continue;
-    if (!folder.children) {
-      folder.children = [];
-    }
+    // Add the folder node to the tree
+    tree.set(folderName, folderNode);
+  } else {
+    // No base path - build tree from all bookmarks (original behavior)
+    for (const bookmark of bookmarks) {
+      // Skip folder nodes (nodes without URLs)
+      if (!bookmark.url) continue;
+      
+      if (bookmark.folderPath.length === 0) continue;
 
-    // If bookmark is directly in top-level folder
-    if (bookmark.folderPath.length === 1 && bookmark.url) {
-      folder.children!.push(bookmark);
-    } else if (bookmark.folderPath.length > 1) {
-      // Nested structure - find or create parent
-      let current = folder;
-      for (let i = 1; i < bookmark.folderPath.length; i++) {
-        const segment = bookmark.folderPath[i];
-        if (!segment) continue;
-        
+      const topLevel = bookmark.folderPath[0];
+      if (!topLevel) continue;
+      
+      if (!tree.has(topLevel)) {
+        tree.set(topLevel, {
+          id: `folder-${topLevel}`,
+          title: topLevel,
+          folderPath: [topLevel],
+          children: [],
+        });
+      }
+
+      const folder = tree.get(topLevel);
+      if (!folder) continue;
+      if (!folder.children) {
+        folder.children = [];
+      }
+
+      // If bookmark is directly in top-level folder
+      if (bookmark.folderPath.length === 1) {
+        folder.children!.push(bookmark);
+      } else if (bookmark.folderPath.length > 1) {
+        // Nested structure - find or create parent folders
+        let current = folder;
+        for (let i = 1; i < bookmark.folderPath.length; i++) {
+          const segment = bookmark.folderPath[i];
+          if (!segment) continue;
+          
+          if (!current.children) {
+            current.children = [];
+          }
+
+          // Look for existing folder node (no URL) with matching title
+          let child = current.children.find((c) => !c.url && c.title === segment);
+          if (!child) {
+            // Create new folder node
+            child = {
+              id: `folder-${bookmark.folderPath.slice(0, i + 1).join("/")}`,
+              title: segment,
+              folderPath: bookmark.folderPath.slice(0, i + 1),
+              children: [],
+            };
+            current.children.push(child);
+          }
+          current = child;
+        }
+
         if (!current.children) {
           current.children = [];
         }
-
-        let child = current.children.find((c) => c.title === segment);
-        if (!child) {
-          child = {
-            id: `folder-${bookmark.folderPath.slice(0, i + 1).join("/")}`,
-            title: segment,
-            folderPath: bookmark.folderPath.slice(0, i + 1),
-            children: [],
-          };
-          current.children.push(child);
-        }
-        current = child;
+        // Add the bookmark to the final folder
+        current.children.push(bookmark);
       }
-
-      if (!current.children) {
-        current.children = [];
-      }
-      current.children.push(bookmark);
     }
   }
 
@@ -422,98 +172,195 @@ function buildTree(bookmarks: BookmarkInfo[]): Map<string, BookmarkInfo> {
 }
 
 /**
- * Renders bookmark tree in code-style format
+ * Makes bookmarks tree collapsible by building HTML directly from bookmarks data
+ * @param messageId - ID of the message to render bookmarks in
+ * @param main - Main container element
+ * @param bookmarks - List of bookmarks to render
+ * @param basePath - Optional base path to strip from folder paths (for nested folder queries)
  */
-function renderTree(
-  container: HTMLElement,
-  tree: Map<string, BookmarkInfo>,
-  indent: number
-): void {
-  const entries = Array.from(tree.entries()).sort((a, b) =>
-    a[0].localeCompare(b[0])
+export function makeBookmarksCollapsible(messageId: string, main: HTMLElement, bookmarks: BookmarkInfo[], basePath: string[] = []): void {
+  const messageBubble = main.querySelector(`[data-message-id="${messageId}"]`) as HTMLElement | null;
+  if (!messageBubble) return;
+
+  // Check if bookmarks tree has already been rendered (prevent duplicate rendering)
+  const existingTree = messageBubble.querySelector(".bookmarks-tree-collapsible");
+  if (existingTree) {
+    return; // Already rendered, don't render again
+  }
+
+  // Find and remove the marker text
+  const walker = document.createTreeWalker(
+    messageBubble,
+    NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+    null
   );
 
-  for (const [key, node] of entries) {
-    const line = document.createElement("div");
-    Object.assign(line.style, {
-      display: "flex",
-      alignItems: "center",
-      padding: `${CURSOR_SPACING.xs} 0`,
-      paddingLeft: `${indent * 16}px`,
-      fontSize: CURSOR_TYPOGRAPHY.fontSize.sm,
-      fontFamily: "monospace",
-      color: CURSOR_COLORS.textPrimary,
-      cursor: node.url ? "pointer" : "default",
-    } as CSSStyleDeclaration);
+  let markerNode: Node | null = null;
+  let node: Node | null;
 
-    // Folder/File icon
-    const icon = document.createElement("span");
-    if (node.url) {
-      // It's a bookmark (file)
-      const favicon = document.createElement("img");
-      favicon.src = getFaviconUrl(node.url);
-      favicon.alt = "";
-      Object.assign(favicon.style, {
-        width: "16px",
-        height: "16px",
-        marginRight: CURSOR_SPACING.sm,
-      } as CSSStyleDeclaration);
-      icon.appendChild(favicon);
-    } else {
-      // It's a folder
-      icon.textContent = "📁";
-      Object.assign(icon.style, {
-        marginRight: CURSOR_SPACING.sm,
-      } as CSSStyleDeclaration);
-    }
-
-    // Name
-    const name = document.createElement("span");
-    name.textContent = node.title;
-    if (node.url) {
-      Object.assign(name.style, {
-        color: "#93c5fd", // Link color
-      } as CSSStyleDeclaration);
-      const url = node.url; // Store in const for closure
-      name.addEventListener("click", () => {
-        window.open(url, "_blank");
-      });
-    }
-
-    line.appendChild(icon);
-    line.appendChild(name);
-
-    // Show URL if it's a bookmark
-    if (node.url) {
-      const urlSpan = document.createElement("span");
-      urlSpan.textContent = `  // ${node.url}`;
-      Object.assign(urlSpan.style, {
-        color: CURSOR_COLORS.textMuted,
-        marginLeft: CURSOR_SPACING.sm,
-        fontSize: CURSOR_TYPOGRAPHY.fontSize.xs,
-      } as CSSStyleDeclaration);
-      line.appendChild(urlSpan);
-    }
-
-    container.appendChild(line);
-
-    // Render children
-    if (node.children && node.children.length > 0) {
-      const childrenMap = new Map<string, BookmarkInfo>();
-      for (const child of node.children) {
-        const childKey =
-          child.folderPath[child.folderPath.length - 1] || child.title;
-        childrenMap.set(childKey, child);
+  // Find the marker
+  while ((node = walker.nextNode())) {
+    if (node.nodeType === Node.TEXT_NODE && node.textContent?.includes("BOOKMARKS_TREE_DATA")) {
+      markerNode = node;
+      break;
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as HTMLElement;
+      if (element.textContent?.includes("BOOKMARKS_TREE_DATA")) {
+        markerNode = element;
+        break;
       }
-      renderTree(container, childrenMap, indent + 1);
     }
   }
-}
 
-/**
- * Shows the bookmarks panel
- */
-export function showBookmarksPanel(): void {
-  const { panel } = createBookmarksPanel();
-  document.body.appendChild(panel);
+  // Build tree structure from bookmarks, stripping the base path if provided
+  const tree = buildBookmarkTreeForCollapsible(bookmarks, basePath);
+
+  // Create collapsible tree container
+  const treeContainer = document.createElement("div");
+  treeContainer.className = "bookmarks-tree-collapsible";
+  Object.assign(treeContainer.style, {
+    fontFamily: "monospace",
+    fontSize: "13px",
+    lineHeight: "1.6",
+    marginTop: "8px",
+  } as CSSStyleDeclaration);
+
+  // Render tree as collapsible HTML
+  const renderNode = (node: BookmarkInfo, parentElement: HTMLElement, indent: number = 0, isExpanded: boolean = false): void => {
+    if (!node.url) {
+      // It's a folder
+      const folderDiv = document.createElement("div");
+      folderDiv.className = "bookmark-folder";
+      Object.assign(folderDiv.style, {
+        paddingLeft: `${indent * 16}px`,
+        marginTop: "2px",
+        cursor: "pointer",
+        userSelect: "none",
+      } as CSSStyleDeclaration);
+
+      const toggle = document.createElement("span");
+      toggle.textContent = isExpanded ? "▼ " : "▶ ";
+      toggle.className = "folder-toggle";
+      Object.assign(toggle.style, {
+        display: "inline-block",
+        width: "12px",
+        color: "#9ca3af",
+        fontSize: "10px",
+        marginRight: "4px",
+        transition: "transform 0.2s",
+      } as CSSStyleDeclaration);
+
+      const icon = document.createElement("span");
+      icon.textContent = "📁 ";
+      icon.style.marginRight = "4px";
+
+      const name = document.createElement("span");
+      name.textContent = node.title;
+      name.style.color = "#e5e7eb";
+
+      folderDiv.appendChild(toggle);
+      folderDiv.appendChild(icon);
+      folderDiv.appendChild(name);
+
+      // Children container (expanded if isExpanded is true)
+      const childrenContainer = document.createElement("div");
+      childrenContainer.className = "folder-children";
+      childrenContainer.style.display = isExpanded ? "block" : "none";
+      Object.assign(childrenContainer.style, {
+        marginLeft: "16px",
+      } as CSSStyleDeclaration);
+
+      // Render children
+      if (node.children) {
+        // Sort children: folders first, then bookmarks
+        const sorted = [...node.children].sort((a, b) => {
+          if (a.url && !b.url) return 1; // Bookmarks after folders
+          if (!a.url && b.url) return -1; // Folders before bookmarks
+          return a.title.localeCompare(b.title);
+        });
+        
+        for (const child of sorted) {
+          renderNode(child, childrenContainer, 0, false); // Don't add extra indent, childrenContainer handles it
+        }
+      }
+
+      folderDiv.appendChild(childrenContainer);
+      parentElement.appendChild(folderDiv);
+
+      // Toggle on click
+      folderDiv.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isExpanded = childrenContainer.style.display !== "none";
+        childrenContainer.style.display = isExpanded ? "none" : "block";
+        toggle.textContent = isExpanded ? "▶ " : "▼ ";
+      });
+    } else {
+      // Bookmark link
+      const linkDiv = document.createElement("div");
+      linkDiv.className = "bookmark-link";
+      Object.assign(linkDiv.style, {
+        paddingLeft: `${indent * 16}px`,
+        marginTop: "2px",
+      } as CSSStyleDeclaration);
+
+      const icon = document.createElement("span");
+      icon.textContent = "🔗 ";
+      icon.style.marginRight = "4px";
+
+      const link = document.createElement("a");
+      link.href = node.url || "#";
+      link.textContent = node.title;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      Object.assign(link.style, {
+        color: "#93c5fd",
+        textDecoration: "underline",
+        cursor: "pointer",
+      } as CSSStyleDeclaration);
+
+      linkDiv.appendChild(icon);
+      linkDiv.appendChild(link);
+      parentElement.appendChild(linkDiv);
+    }
+  };
+
+        // Render all root nodes (sorted)
+        // If basePath is provided, we have a single root folder that should be expanded by default
+        const entries = Array.from(tree.entries()).sort((a, b) =>
+          a[0].localeCompare(b[0])
+        );
+        
+        // If basePath is provided, expand the root folder by default (it's the queried folder)
+        const shouldExpandRoot = basePath.length > 0;
+        
+        for (const [, node] of entries) {
+          renderNode(node, treeContainer, 0, shouldExpandRoot);
+        }
+
+  // Replace marker with collapsible tree
+  if (markerNode && markerNode.parentNode) {
+    const parent = markerNode.parentNode;
+    
+    // Remove the marker node
+    if (markerNode.nodeType === Node.TEXT_NODE) {
+      // If it's a text node, replace its content
+      const textNode = markerNode as Text;
+      const parentElement = textNode.parentElement;
+      if (parentElement) {
+        textNode.remove();
+        parentElement.appendChild(treeContainer);
+      }
+    } else {
+      // If it's an element, replace it
+      parent.replaceChild(treeContainer, markerNode);
+    }
+  } else {
+    // Fallback: append after heading
+    const heading = messageBubble.querySelector("h2");
+    if (heading && heading.parentElement) {
+      heading.parentElement.insertBefore(treeContainer, heading.nextSibling);
+    } else {
+      messageBubble.appendChild(treeContainer);
+    }
+  }
 }

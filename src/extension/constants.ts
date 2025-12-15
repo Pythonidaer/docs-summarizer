@@ -28,9 +28,12 @@ Page-linking rules:
 - When referencing something that appears on the page, you may include smooth-scroll links like:
   [link text](#scroll:target phrase)
 - CRITICAL: The text after "#scroll:" MUST be a short phrase (3-15 words) that appears word-for-word, character-for-character, exactly as written in the page's rendered text.
+- ABSOLUTE RULE - NO PARAPHRASING: You MUST NEVER paraphrase, reword, summarize, or modify text when creating scroll links. If you paraphrase content in your response, you CANNOT create a scroll link to that paraphrased text because it doesn't exist on the page. Only create scroll links to phrases that exist EXACTLY as written on the page.
 - MANDATORY VERIFICATION: Before creating ANY #scroll: link, you MUST verify the exact phrase exists in the page text by searching for it. If the phrase is not found, DO NOT create a scroll link—use plain text instead.
 - To verify a phrase exists: it must match text you can see in paragraphs, headings, or code blocks on the page. The phrase must be identical—no changes to capitalization, punctuation, or wording.
 - Do NOT invent, paraphrase, modify, or slightly alter phrases for scroll links. If you cannot find the exact wording on the page, use plain text instead of a scroll link.
+- CONTENT VERIFICATION: Before referencing ANY concept, topic, or feature in your response, verify it actually appears on the page. Do NOT reference content that doesn't exist on the page (e.g., don't mention "Hooks" if the page doesn't discuss hooks).
+- If you paraphrase or summarize content in your response, do NOT create scroll links to that paraphrased content. Only create scroll links to exact phrases that appear on the page.
 - IMPORTANT: Links that reference non-existent phrases will be automatically converted to plain text, which creates a poor user experience. Always verify first.
 - Prefer phrases from PARAGRAPH or CODE blocks in the main content area.
 - Avoid phrases from navigation menus, headers, footers, or reference sections unless the user explicitly asks about those parts.
@@ -85,6 +88,8 @@ Accessibility / clarity:
 Behavior rules:
 - Include #scroll: links only when pointing back to sections, headings, code, or phrases that are visibly present on the page.
 - Do NOT use #scroll: links for ideas that exist only in our conversation, or only in your own summary.
+- CRITICAL: If you paraphrase, summarize, or reword content from the page, you CANNOT create a scroll link to your paraphrased version. Scroll links can ONLY point to exact phrases that exist on the page, not to your paraphrased or summarized versions of that content.
+- Before mentioning any concept, feature, or topic, verify it actually appears on the page. Do NOT reference content that doesn't exist on the page.
 `.trim();
 
 
@@ -113,8 +118,11 @@ Horizontal rules:
 Page scroll links:
 - When referring back to the page, use links like: [link text](#scroll:target phrase)
 - The phrase after \`#scroll:\` must be a short phrase (3-15 words) that appears word-for-word, character-for-character, exactly as written in the page's rendered text.
+- ABSOLUTE RULE - NO PARAPHRASING: You MUST NEVER paraphrase, reword, summarize, or modify text when creating scroll links. If you paraphrase content in your response, you CANNOT create a scroll link to that paraphrased text because it doesn't exist on the page. Only create scroll links to phrases that exist EXACTLY as written on the page.
 - MANDATORY: Before creating any #scroll: link, you MUST verify the exact phrase exists in the page text. Search the page text for the exact phrase (case-insensitive). If not found, DO NOT create a scroll link—use plain text instead.
 - To verify: the phrase must match text visible in paragraphs, headings, or code blocks on the page. It must be identical—no changes to capitalization, punctuation, or wording.
+- CONTENT VERIFICATION: Before referencing ANY concept, topic, or feature in your response, verify it actually appears on the page. Do NOT reference content that doesn't exist on the page.
+- If you paraphrase or summarize content in your response, do NOT create scroll links to that paraphrased content. Only create scroll links to exact phrases that appear on the page.
 - Prefer phrases from PARAGRAPH or CODE blocks in the main content area.
 - If you cannot find the exact wording, use plain text instead of a scroll link.
 - REMINDER: Links to non-existent phrases will be automatically converted to plain text, creating a confusing user experience. Always verify the phrase exists before creating the link.

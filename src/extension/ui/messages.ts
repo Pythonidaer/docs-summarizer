@@ -2,6 +2,7 @@ import type { Message } from "../types";
 import { renderMarkdownInto } from "../markdown";
 import { PROMPT_VOICES } from "../prompts/voices";
 import { exportMessageAsMarkdown, exportMessageAsPDF } from "../export";
+import { makeBookmarksCollapsible } from "./bookmarks";
 
 /**
  * Creates a loading indicator with three pulsing circles (like ChatGPT)
@@ -93,6 +94,15 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
             } else {
                 // Render assistant messages with simple markdown formatting
                 renderMarkdownInto(bubble, msg.text);
+                
+                // If this message has bookmarks data, make it collapsible
+                // This ensures bookmarks persist when messages are re-rendered
+                if (msg.bookmarks && msg.text.includes("BOOKMARKS_TREE_DATA")) {
+                  // Use setTimeout to ensure DOM is fully rendered before processing
+                  setTimeout(() => {
+                    makeBookmarksCollapsible(msg.id, main, msg.bookmarks!, msg.bookmarksFolderPath || []);
+                  }, 0);
+                }
             }
 
             // Add metadata footer (response time, tokens, cost) in bottom-right

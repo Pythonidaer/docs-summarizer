@@ -15,6 +15,7 @@ export interface BookmarksCommandResult {
   message: string;
   needsPermission?: boolean;
   bookmarks?: BookmarkInfo[]; // Include bookmarks data for collapsible tree
+  folderPath?: string[]; // The folder path that was queried (for nested folder queries)
 }
 
 /**
@@ -144,7 +145,7 @@ export async function executeBookmarksCommand(
       };
     }
 
-    // Parse folder path if specified (e.g., "--bookmarks technologies/Ruby" or "bookmarks technologies Ruby")
+    // Parse folder path if specified (e.g., "--bookmarks technologies/Ruby" or "--bookmarks 'Data Analytics'")
     const trimmed = input.trim();
     let folderPath: string[] | null = null;
     
@@ -163,11 +164,53 @@ export async function executeBookmarksCommand(
     }
     
     if (remaining.length > 0) {
-      // Try to parse as folder path (e.g., "technologies/Ruby" or "technologies Ruby")
+      // Check if the remaining text contains "/" (nested path)
+      // Always prioritize "/" splitting for nested paths, even if quoted
       if (remaining.includes("/")) {
-        folderPath = remaining.split("/").map(p => p.trim()).filter(p => p.length > 0);
+        // Handle nested paths - split by "/" and trim each part
+        // This handles both "Data Analytics/BigQuery" and "Data Analytics/BigQuery/Nested"
+        // Also handles quoted nested paths like '"Data Analytics"/BigQuery' or '"Data Analytics/BigQuery"'
+        let pathToSplit = remaining;
+        
+        // If the entire path is quoted, remove outer quotes first
+        if ((remaining.startsWith('"') && remaining.endsWith('"')) ||
+            (remaining.startsWith("'") && remaining.endsWith("'"))) {
+          pathToSplit = remaining.slice(1, -1).trim();
+        }
+        
+        // Split by "/" and trim each part, handling individual quoted segments
+        folderPath = pathToSplit.split("/").map(p => {
+          // Remove quotes from individual segments if present
+          const trimmed = p.trim();
+          if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+              (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+            return trimmed.slice(1, -1).trim();
+          }
+          return trimmed;
+        }).filter(p => p.length > 0);
       } else {
-        folderPath = remaining.split(/\s+/).filter(p => p.length > 0);
+        // No "/" found - check if quoted (single folder with spaces)
+        if ((remaining.startsWith('"') && remaining.endsWith('"')) ||
+            (remaining.startsWith("'") && remaining.endsWith("'"))) {
+          // Remove quotes and treat as single folder name
+          const folderName = remaining.slice(1, -1).trim();
+          if (folderName.length > 0) {
+            folderPath = [folderName];
+          }
+        } else {
+          // Try to match folder names intelligently
+          // For multi-word folder names, treat the whole thing as a single folder name
+          // This handles "Data Analytics" as one folder instead of ["Data", "Analytics"]
+          const spaceSplit = remaining.split(/\s+/).filter(p => p.length > 0);
+          
+          if (spaceSplit.length > 1) {
+            // Multiple words - treat as single folder name (handles spaces)
+            folderPath = [remaining];
+          } else {
+            // Single word - use as-is
+            folderPath = spaceSplit;
+          }
+        }
       }
     }
 
@@ -191,11 +234,18 @@ export async function executeBookmarksCommand(
 
     const formatted = formatBookmarksAsCodeTree(bookmarks);
     
-    return {
+    const result: BookmarksCommandResult = {
       success: true,
       message: formatted,
       bookmarks: bookmarks, // Pass bookmarks data for collapsible tree
     };
+    
+    // Only include folderPath if it exists (for nested folder queries)
+    if (folderPath && folderPath.length > 0) {
+      result.folderPath = folderPath;
+    }
+    
+    return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     return {

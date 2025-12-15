@@ -15,6 +15,8 @@ export interface Message {
     voiceId?: string; // Optional: prompt voice ID used for assistant messages
     responseTime?: number; // Response time in seconds
     tokenUsage?: TokenUsage | null; // Token usage and cost information (null when not available)
+    bookmarks?: import("./storage/bookmarks").BookmarkInfo[]; // Optional: bookmarks data for bookmark command messages
+    bookmarksFolderPath?: string[]; // Optional: folder path that was queried (for nested folder queries)
 }
 // gpt-5.1
 // Complex reasoning, broad world knowledge, and code-heavy or multi-step agentic tasks

@@ -53,21 +53,30 @@ describe("buildStyleInstructions", () => {
   it("builds paragraph instruction", () => {
     const result = buildStyleInstructions([{ type: "paragraphs", value: 3 }]);
     expect(result).toContain("exactly 3 paragraphs");
+    expect(result).toContain("ONLY paragraph");
+    expect(result).toContain("no headings");
+    expect(result).toContain("no bullet lists");
     expect(result).toContain("Do not exceed or fall short");
+    expect(result).toContain("THIS OVERRIDES ALL OTHER INSTRUCTIONS");
   });
 
   it("builds single paragraph instruction", () => {
     const result = buildStyleInstructions([{ type: "paragraphs", value: 1 }]);
     expect(result).toContain("exactly 1 paragraph");
-    expect(result).not.toContain("paragraphs");
+    expect(result).toContain("ONLY paragraph");
+    expect(result).toContain("THIS OVERRIDES ALL OTHER INSTRUCTIONS");
   });
 
   it("builds paragraph instruction with different values", () => {
     const result1 = buildStyleInstructions([{ type: "paragraphs", value: 5 }]);
     expect(result1).toContain("exactly 5 paragraphs");
+    expect(result1).toContain("ONLY paragraph");
+    expect(result1).toContain("THIS OVERRIDES ALL OTHER INSTRUCTIONS");
     
     const result2 = buildStyleInstructions([{ type: "paragraphs", value: 1 }]);
     expect(result2).toContain("exactly 1 paragraph");
+    expect(result2).toContain("ONLY paragraph");
+    expect(result2).toContain("THIS OVERRIDES ALL OTHER INSTRUCTIONS");
   });
 });
 

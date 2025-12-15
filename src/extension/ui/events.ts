@@ -11,250 +11,7 @@ import { parseHelpCommand } from "../help";
 import { parseStyleCommands } from "../styleCommands";
 import { parseBookmarksCommand, executeBookmarksCommand, tryRequestBookmarksPermission } from "../bookmarksCommand";
 import type { BookmarkInfo } from "../storage/bookmarks";
-
-/**
- * Makes bookmarks tree collapsible by building HTML directly from bookmarks data
- */
-function makeBookmarksCollapsible(messageId: string, main: HTMLElement, bookmarks: BookmarkInfo[]): void {
-  const messageBubble = main.querySelector(`[data-message-id="${messageId}"]`) as HTMLElement | null;
-  if (!messageBubble) return;
-
-  // Find and remove the marker text
-  const walker = document.createTreeWalker(
-    messageBubble,
-    NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
-    null
-  );
-
-  let markerNode: Node | null = null;
-  let node: Node | null;
-
-  // Find the marker
-  while ((node = walker.nextNode())) {
-    if (node.nodeType === Node.TEXT_NODE && node.textContent?.includes("BOOKMARKS_TREE_DATA")) {
-      markerNode = node;
-      break;
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const element = node as HTMLElement;
-      if (element.textContent?.includes("BOOKMARKS_TREE_DATA")) {
-        markerNode = element;
-        break;
-      }
-    }
-  }
-
-  // Build tree structure from bookmarks
-  const tree = buildBookmarkTreeForCollapsible(bookmarks);
-
-  // Create collapsible tree container
-  const treeContainer = document.createElement("div");
-  treeContainer.className = "bookmarks-tree-collapsible";
-  Object.assign(treeContainer.style, {
-    fontFamily: "monospace",
-    fontSize: "13px",
-    lineHeight: "1.6",
-    marginTop: "8px",
-  } as CSSStyleDeclaration);
-
-  // Render tree as collapsible HTML
-  const renderNode = (node: BookmarkInfo, parentElement: HTMLElement, indent: number = 0): void => {
-    if (!node.url) {
-      // It's a folder
-      const folderDiv = document.createElement("div");
-      folderDiv.className = "bookmark-folder";
-      Object.assign(folderDiv.style, {
-        paddingLeft: `${indent * 16}px`,
-        marginTop: "2px",
-        cursor: "pointer",
-        userSelect: "none",
-      } as CSSStyleDeclaration);
-
-      const toggle = document.createElement("span");
-      toggle.textContent = "▶ ";
-      toggle.className = "folder-toggle";
-      Object.assign(toggle.style, {
-        display: "inline-block",
-        width: "12px",
-        color: "#9ca3af",
-        fontSize: "10px",
-        marginRight: "4px",
-        transition: "transform 0.2s",
-      } as CSSStyleDeclaration);
-
-      const icon = document.createElement("span");
-      icon.textContent = "📁 ";
-      icon.style.marginRight = "4px";
-
-      const name = document.createElement("span");
-      name.textContent = node.title;
-      name.style.color = "#e5e7eb";
-
-      folderDiv.appendChild(toggle);
-      folderDiv.appendChild(icon);
-      folderDiv.appendChild(name);
-
-      // Children container (collapsed by default)
-      const childrenContainer = document.createElement("div");
-      childrenContainer.className = "folder-children";
-      childrenContainer.style.display = "none";
-      Object.assign(childrenContainer.style, {
-        marginLeft: "16px",
-      } as CSSStyleDeclaration);
-
-      // Render children
-      if (node.children) {
-        // Sort children: folders first, then bookmarks
-        const sorted = [...node.children].sort((a, b) => {
-          if (a.url && !b.url) return 1; // Bookmarks after folders
-          if (!a.url && b.url) return -1; // Folders before bookmarks
-          return a.title.localeCompare(b.title);
-        });
-        
-        for (const child of sorted) {
-          renderNode(child, childrenContainer, 0); // Don't add extra indent, childrenContainer handles it
-        }
-      }
-
-      folderDiv.appendChild(childrenContainer);
-      parentElement.appendChild(folderDiv);
-
-      // Toggle on click
-      folderDiv.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const isExpanded = childrenContainer.style.display !== "none";
-        childrenContainer.style.display = isExpanded ? "none" : "block";
-        toggle.textContent = isExpanded ? "▶ " : "▼ ";
-      });
-    } else {
-      // Bookmark link
-      const linkDiv = document.createElement("div");
-      linkDiv.className = "bookmark-link";
-      Object.assign(linkDiv.style, {
-        paddingLeft: `${indent * 16}px`,
-        marginTop: "2px",
-      } as CSSStyleDeclaration);
-
-      const icon = document.createElement("span");
-      icon.textContent = "🔗 ";
-      icon.style.marginRight = "4px";
-
-      const link = document.createElement("a");
-      link.href = node.url || "#";
-      link.textContent = node.title;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      Object.assign(link.style, {
-        color: "#93c5fd",
-        textDecoration: "underline",
-        cursor: "pointer",
-      } as CSSStyleDeclaration);
-
-      linkDiv.appendChild(icon);
-      linkDiv.appendChild(link);
-      parentElement.appendChild(linkDiv);
-    }
-  };
-
-  // Render all root nodes (sorted)
-  const entries = Array.from(tree.entries()).sort((a, b) =>
-    a[0].localeCompare(b[0])
-  );
-  
-  for (const [, node] of entries) {
-    renderNode(node, treeContainer, 0);
-  }
-
-  // Replace marker with collapsible tree
-  if (markerNode && markerNode.parentNode) {
-    const parent = markerNode.parentNode;
-    
-    // Remove the marker node
-    if (markerNode.nodeType === Node.TEXT_NODE) {
-      // If it's a text node, replace its content
-      const textNode = markerNode as Text;
-      const parentElement = textNode.parentElement;
-      if (parentElement) {
-        textNode.remove();
-        parentElement.appendChild(treeContainer);
-      }
-    } else {
-      // If it's an element, replace it
-      parent.replaceChild(treeContainer, markerNode);
-    }
-  } else {
-    // Fallback: append after heading
-    const heading = messageBubble.querySelector("h2");
-    if (heading && heading.parentElement) {
-      heading.parentElement.insertBefore(treeContainer, heading.nextSibling);
-    } else {
-      messageBubble.appendChild(treeContainer);
-    }
-  }
-}
-
-/**
- * Builds a tree structure from bookmarks for collapsible rendering
- */
-function buildBookmarkTreeForCollapsible(bookmarks: BookmarkInfo[]): Map<string, BookmarkInfo> {
-  const tree = new Map<string, BookmarkInfo>();
-
-  for (const bookmark of bookmarks) {
-    if (bookmark.folderPath.length === 0) continue;
-
-    const topLevel = bookmark.folderPath[0];
-    if (!topLevel) continue;
-    
-    if (!tree.has(topLevel)) {
-      tree.set(topLevel, {
-        id: `folder-${topLevel}`,
-        title: topLevel,
-        folderPath: [topLevel],
-        children: [],
-      });
-    }
-
-    const folder = tree.get(topLevel);
-    if (!folder) continue;
-    if (!folder.children) {
-      folder.children = [];
-    }
-
-    // If bookmark is directly in top-level folder
-    if (bookmark.folderPath.length === 1 && bookmark.url) {
-      folder.children!.push(bookmark);
-    } else if (bookmark.folderPath.length > 1) {
-      // Nested structure - find or create parent
-      let current = folder;
-      for (let i = 1; i < bookmark.folderPath.length; i++) {
-        const segment = bookmark.folderPath[i];
-        if (!segment) continue;
-        
-        if (!current.children) {
-          current.children = [];
-        }
-
-        let child = current.children.find((c) => c.title === segment && !c.url);
-        if (!child) {
-          child = {
-            id: `folder-${bookmark.folderPath.slice(0, i + 1).join("/")}`,
-            title: segment,
-            folderPath: bookmark.folderPath.slice(0, i + 1),
-            children: [],
-          };
-          current.children.push(child);
-        }
-        current = child;
-      }
-
-      if (!current.children) {
-        current.children = [];
-      }
-      current.children.push(bookmark);
-    }
-  }
-
-  return tree;
-}
+import { makeBookmarksCollapsible } from "./bookmarks";
 
 export interface WireDrawerEventsArgs {
   root: HTMLDivElement;
@@ -338,19 +95,25 @@ export function wireDrawerEvents({
 
         // Add response message
         const messageId = `assistant-${Date.now()}`;
-        messages.push({
+        const message: Message = {
           id: messageId,
           role: "assistant",
           text: result.message,
           voiceId: getPromptVoiceId(),
-        });
+        };
+        // Only add bookmarks if they exist
+        if (result.bookmarks) {
+          message.bookmarks = result.bookmarks;
+        }
+        // Store the folder path that was queried (for nested folder queries)
+        if (result.folderPath) {
+          message.bookmarksFolderPath = result.folderPath;
+        }
+        messages.push(message);
 
         renderMessages(main, messages);
-
-        // Make bookmarks collapsible if this is a bookmarks message
-        if (result.success && result.bookmarks) {
-          makeBookmarksCollapsible(messageId, main, result.bookmarks);
-        }
+        // Note: makeBookmarksCollapsible is called automatically by renderMessages
+        // when it detects a message with bookmarks data, so we don't need to call it here
 
         // If permission is needed, add a button after rendering
         if (result.needsPermission) {

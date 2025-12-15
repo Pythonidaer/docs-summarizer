@@ -109,7 +109,7 @@ function getMainHelpMenu(): string {
 
 ### Bookmarks
 - \`--bookmarks\` - View all bookmarks in code-tree format
-- \`--bookmarks <folder/path>\` - View bookmarks from a specific folder (e.g., \`--bookmarks technologies/Ruby\`)
+- \`--bookmarks folder/path\` - View bookmarks from a specific folder or nested path (e.g., \`--bookmarks Jobs\`, \`--bookmarks Jobs/Job Boards\`)
 
 ### Style Modifiers
 - \`--N-paragraphs\` - Limit response to N paragraphs (e.g., \`--3-paragraphs\`)

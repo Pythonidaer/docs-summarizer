@@ -61,16 +61,31 @@ export function extractPageTextFromDoc(doc: Document): string {
   return raw.replace(/\s+/g, " ").trim();
 }
 
+// Track resize listener to avoid duplicates
+let resizeListener: (() => void) | null = null;
+let currentDrawerState: {
+  root: HTMLElement;
+  drawer: HTMLElement;
+  handle: HTMLElement;
+  isOpen: boolean;
+} | null = null;
+
 /**
- * Controls drawer open/close state and handle positioning.
+ * Updates handle position based on drawer's actual rendered width.
+ * This is called both when opening/closing and on window resize.
+ * @param isResizeUpdate - If true, temporarily disables transition to prevent animation gap
  */
-export function setDrawerOpen(
-  root: HTMLElement,
+function updateHandlePosition(
   drawer: HTMLElement,
   handle: HTMLElement,
-  isOpen: boolean
+  isOpen: boolean,
+  isResizeUpdate: boolean = false
 ): void {
-  drawer.style.transform = isOpen ? "translateX(0)" : "translateX(100%)";
+  // During resize, temporarily disable transition to prevent animation gap
+  const originalTransition = handle.style.transition;
+  if (isResizeUpdate) {
+    handle.style.transition = "none";
+  }
 
   if (isOpen) {
     // Get the actual rendered width of the drawer (respects maxWidth: 80vw)
@@ -85,6 +100,31 @@ export function setDrawerOpen(
     handle.style.right = "0";
     handle.style.transform = "translateY(-50%)";
   }
+
+  // Re-enable transition after a brief moment (allows browser to apply the position change)
+  if (isResizeUpdate) {
+    // Use requestAnimationFrame to ensure the position is applied before re-enabling transition
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        handle.style.transition = originalTransition;
+      });
+    });
+  }
+}
+
+/**
+ * Controls drawer open/close state and handle positioning.
+ */
+export function setDrawerOpen(
+  root: HTMLElement,
+  drawer: HTMLElement,
+  handle: HTMLElement,
+  isOpen: boolean
+): void {
+  drawer.style.transform = isOpen ? "translateX(0)" : "translateX(100%)";
+
+  // Update handle position (not a resize update, so allow smooth transition)
+  updateHandlePosition(drawer, handle, isOpen, false);
   
   // Update arrow SVG direction and tooltip
   // Arrow is already centered via flexbox (handle has display: flex, alignItems: center, justifyContent: center)
@@ -106,6 +146,41 @@ export function setDrawerOpen(
     root.classList.add("docs-summarizer--open");
   } else {
     root.classList.remove("docs-summarizer--open");
+  }
+
+  // Set up or remove resize listener
+  if (isOpen) {
+    // Store current state for resize listener
+    currentDrawerState = { root, drawer, handle, isOpen };
+    
+    // Remove old listener if it exists
+    if (resizeListener) {
+      window.removeEventListener("resize", resizeListener);
+    }
+    
+    // Add new resize listener
+    resizeListener = () => {
+      if (currentDrawerState && currentDrawerState.isOpen) {
+        // Use requestAnimationFrame to ensure layout has updated
+        // Pass isResizeUpdate=true to disable transition and prevent animation gap
+        requestAnimationFrame(() => {
+          updateHandlePosition(
+            currentDrawerState!.drawer,
+            currentDrawerState!.handle,
+            true,
+            true // isResizeUpdate - prevents animation gap
+          );
+        });
+      }
+    };
+    window.addEventListener("resize", resizeListener);
+  } else {
+    // Remove resize listener when drawer is closed
+    if (resizeListener) {
+      window.removeEventListener("resize", resizeListener);
+      resizeListener = null;
+    }
+    currentDrawerState = null;
   }
 }
 

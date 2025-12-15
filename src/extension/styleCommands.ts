@@ -44,8 +44,12 @@ export function buildStyleInstructions(commands: StyleCommand[]): string {
     switch (cmd.type) {
       case 'paragraphs':
         instructions.push(
-          `Your response must be exactly ${cmd.value} paragraph${cmd.value === 1 ? '' : 's'} long. ` +
-          `Do not exceed or fall short of this requirement.`
+          `CRITICAL FORMATTING REQUIREMENT - THIS OVERRIDES ALL OTHER INSTRUCTIONS: Your response must be exactly ${cmd.value} paragraph${cmd.value === 1 ? '' : 's'} long. ` +
+          `You MUST use ONLY paragraph text—no headings (##, ###, etc.), no bullet lists (-, *, •), no numbered lists (1., 2., etc.), no code blocks, no horizontal rules, and absolutely no additional sections like "Key takeaways", "Core takeaways", "Summary", or any other structured content. ` +
+          `Each paragraph should be a continuous block of text separated by blank lines. ` +
+          `This requirement takes precedence over any voice instructions about highlighting takeaways, creating structured sections, or adding summaries. ` +
+          `Do not exceed or fall short of this requirement. ` +
+          `If the user wants structured content, summaries, or key takeaways, they can ask for it separately.`
         );
         break;
     }
