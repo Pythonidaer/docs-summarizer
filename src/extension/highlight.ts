@@ -320,6 +320,7 @@ export async function scrollToPageMatch(term: string): Promise<void> {
 
     const span = document.createElement("span");
     span.style.backgroundColor = "#FFD6A5"; // Light orange/peach for spanned highlights
+    span.style.color = "#1a1a1a"; // Dark text for readability on light background
     span.style.borderRadius = "2px";
     span.style.padding = "0 1px";
 

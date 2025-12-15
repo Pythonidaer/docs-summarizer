@@ -63,7 +63,8 @@ export const DRAWER_STYLE_CSS = `
 export const GLOBAL_HIGHLIGHT_STYLE_CSS = `
   .docs-summarizer-page-highlight {
     background-color: #FFF4CC !important;
-    transition: background-color 0.2s ease-out;
+    color: #1a1a1a !important;
+    transition: background-color 0.2s ease-out, color 0.2s ease-out;
   }
 `;
 
