@@ -107,6 +107,10 @@ function getMainHelpMenu(): string {
 - \`--voices\` - List all prompt voices
 - \`--style\` - Style modifier commands
 
+### Bookmarks
+- \`--bookmarks\` - View all bookmarks in code-tree format
+- \`--bookmarks <folder/path>\` - View bookmarks from a specific folder (e.g., \`--bookmarks technologies/Ruby\`)
+
 ### Style Modifiers
 - \`--N-paragraphs\` - Limit response to N paragraphs (e.g., \`--3-paragraphs\`)
 

@@ -364,6 +364,63 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+
+  if (message.type === 'CHECK_BOOKMARKS_PERMISSION') {
+    chrome.permissions.contains({ permissions: ["bookmarks"] }, (result) => {
+      sendResponse({ hasPermission: result === true });
+    });
+    return true;
+  }
+
+  if (message.type === 'REQUEST_BOOKMARKS_PERMISSION') {
+    console.log('[Docs Summarizer] Requesting bookmarks permission from background script');
+    
+    // Check current permission status first
+    chrome.permissions.contains({ permissions: ["bookmarks"] }, (hasPermission) => {
+      if (hasPermission) {
+        console.log('[Docs Summarizer] Permission already granted');
+        sendResponse({ granted: true });
+        return;
+      }
+      
+      // Request the permission
+      chrome.permissions.request({ permissions: ["bookmarks"] }, (granted) => {
+        console.log('[Docs Summarizer] Permission request result:', granted);
+        console.log('[Docs Summarizer] chrome.runtime.lastError:', chrome.runtime.lastError);
+        
+        if (chrome.runtime.lastError) {
+          console.error('[Docs Summarizer] Permission request error:', chrome.runtime.lastError);
+          sendResponse({ 
+            granted: false, 
+            error: chrome.runtime.lastError.message 
+          });
+        } else {
+          // Verify it was actually granted
+          chrome.permissions.contains({ permissions: ["bookmarks"] }, (nowHasPermission) => {
+            console.log('[Docs Summarizer] Permission verification:', nowHasPermission);
+            sendResponse({ granted: nowHasPermission === true });
+          });
+        }
+      });
+    });
+    return true; // Keep channel open for async response
+  }
+
+  if (message.type === 'GET_ALL_BOOKMARKS') {
+    if (!chrome.bookmarks) {
+      sendResponse({ error: 'Bookmarks API not available' });
+      return true;
+    }
+    
+    chrome.bookmarks.getTree((tree) => {
+      if (chrome.runtime.lastError) {
+        sendResponse({ error: chrome.runtime.lastError.message });
+      } else {
+        sendResponse({ bookmarks: tree });
+      }
+    });
+    return true;
+  }
 });
 
 // Clean up when detached window closes

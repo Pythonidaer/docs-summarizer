@@ -62,6 +62,7 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
         } as CSSStyleDeclaration);
 
         const bubble = document.createElement("div");
+        bubble.setAttribute("data-message-id", msg.id);
         const isLoading = msg.role === "assistant" && msg.loading === true;
         Object.assign(bubble.style, {
             maxWidth: "80%",

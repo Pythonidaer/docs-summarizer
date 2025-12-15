@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Proof-of-concept extension to summarize documentation pages.",
   "permissions": ["activeTab", "scripting", "storage"],
+  "optional_permissions": ["bookmarks"],
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_title": "Docs Summarizer"

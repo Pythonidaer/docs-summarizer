@@ -1,6 +1,5 @@
 // src/extension/ui/toolbar.ts
-// Toolbar is now minimal - dropdowns and controls moved to footer
-// This file kept for backward compatibility but returns empty/minimal toolbar
+// Toolbar (currently empty, but structure kept for future use)
 
 export interface ToolbarElements {
   toolbar: HTMLDivElement;
@@ -17,7 +16,9 @@ export function createToolbar(): ToolbarElements {
     marginBottom: "8px",
   } as CSSStyleDeclaration);
 
-  // Toolbar is now empty - all controls moved to footer
+  // Toolbar is currently empty - bookmarks are accessed via --bookmarks command
+  // This structure is kept for future toolbar items
+
   return {
     toolbar,
   };

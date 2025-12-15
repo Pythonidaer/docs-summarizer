@@ -1,15 +1,18 @@
 /** @jest-environment jsdom */
 
 import { createToolbar } from "../ui/toolbar";
-import { DEFAULT_MODEL_SETTINGS } from "../constants";
 
 describe("createToolbar", () => {
-  test("toolbar is now empty or minimal (dropdowns moved to footer)", () => {
+  test("creates toolbar element", () => {
     const { toolbar } = createToolbar();
 
     expect(toolbar).toBeInstanceOf(HTMLDivElement);
-    // Toolbar may be empty or contain minimal structure
   });
 
+  test("toolbar is empty by default (bookmarks accessed via --bookmarks command)", () => {
+    const { toolbar } = createToolbar();
+
+    expect(toolbar.children.length).toBe(0);
+  });
 });
 
