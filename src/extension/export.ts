@@ -7,7 +7,6 @@ import { PROMPT_VOICES } from "./prompts/voices";
  */
 export function exportMessageAsMarkdown(msg: Message): void {
   if (msg.role !== "assistant") {
-    console.warn("[Docs Summarizer] Can only export assistant messages");
     return;
   }
 
@@ -199,7 +198,6 @@ function processInlineMarkdown(text: string): string {
  */
 export function exportMessageAsPDF(msg: Message): void {
   if (msg.role !== "assistant") {
-    console.warn("[Docs Summarizer] Can only export assistant messages");
     return;
   }
 

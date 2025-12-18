@@ -249,7 +249,6 @@ export async function summarizeWithOpenAI(
   }
   const instructions = buildInstructions(instructionsOptions);
 
-  console.log("[Docs Summarizer] Using prompt voice (summary)", { promptVoiceId, styleCommands });
 
   return callOpenAI(input, instructions, modelSettings, "summary", undefined);
 }
@@ -275,7 +274,6 @@ export async function chatWithOpenAI(
   }
   const instructions = buildInstructions(instructionsOptions);
 
-  console.log("[Docs Summarizer] Using prompt voice (chat)", { promptVoiceId, styleCommands });
 
   return callOpenAI(input, instructions, modelSettings, "chat", history);
 }

@@ -230,10 +230,6 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
         const pageTextForValidation = getPageTextForLinks();
         if (!pageTextForValidation) {
           // No page text available - render as plain text
-          console.warn(
-            "[Docs Summarizer] Scroll link phrase validation skipped (no page text):",
-            scrollTerm
-          );
           container.appendChild(document.createTextNode(label));
         } else {
           // Normalize whitespace for comparison (collapse multiple spaces/newlines to single space)
@@ -261,11 +257,7 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
 
           if (!exactMatch && !lenientMatch && !punctLenientMatch) {
             // Phrase doesn't exist - render as plain text instead of a link
-            console.warn(
-              "[Docs Summarizer] Scroll link phrase not found in page text, rendering as plain text:",
-              scrollTerm,
-              "Tried:", normalizedTerm, "|", ultraNormalizedTerm, "|", termWithoutTrailingPunct
-            );
+            // Phrase not found - render as plain text
             container.appendChild(document.createTextNode(label));
           } else {
             // Phrase exists - render as clickable link
@@ -367,12 +359,6 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
             
         a.addEventListener("click", (event) => {
           event.preventDefault();
-          console.log("[Docs Summarizer] Scroll link clicked", {
-            label,
-            href,
-            term: termForClick,
-            originalTerm: scrollTerm,
-          });
           
           // Check if we're in a detached window (no document.body or different origin)
           const isDetachedWindow = 
@@ -402,7 +388,6 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
                   );
                 } else if (response && !response.success) {
                   // Handle error response from background script
-                  console.error("[Docs Summarizer] Scroll failed:", response.error);
                   const errorMsg = response.error || "Unknown error";
                   // Check if it's a "connection lost" error that might auto-recover
                   if (errorMsg.includes("Connection lost") && errorMsg.includes("try clicking the link again")) {
@@ -426,14 +411,6 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
           }
         });
 
-            console.log("[Docs Summarizer] Render scroll link", {
-              rawLabel: match.linkLabel,
-              preCleanedLabel: label,
-              finalCleanedLabel: cleanLabel,
-              href,
-              term: scrollTerm,
-            });
-
             container.appendChild(a);
           }
         }
@@ -456,14 +433,8 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
         a.style.color = "#93c5fd"; // external links
         a.style.textDecoration = "underline";
 
-        console.log("[Docs Summarizer] Render external link", { label, href });
-
         container.appendChild(a);
       } else {
-        console.log("[Docs Summarizer] Rendering plain text (no link)", {
-          label,
-          href,
-        });
         container.appendChild(document.createTextNode(label));
       }
     }

@@ -180,27 +180,6 @@ function findCrossNodeRange(
     }
   }
 
-  // DEBUG: Log cross-node range finding details
-  console.log("[DEBUG findCrossNodeRange]", {
-    normalizedIndex,
-    normalizedTermLength: normalizedTerm.length,
-    textNodesCount: textNodes.length,
-    textNodesInfo: textNodes.map((tn, idx) => ({
-      index: idx,
-      textLength: tn.text.length,
-      normalizedLength: tn.normalized.length,
-      startCount: tn.startCount,
-      textSample: tn.text.slice(0, 50),
-      normalizedSample: tn.normalized.slice(0, 50)
-    })),
-    startNodeFound: !!startNode,
-    endNodeFound: !!endNode,
-    startOffset,
-    endOffset,
-    startNodeText: startNode?.textContent?.slice(0, 50),
-    endNodeText: endNode?.textContent?.slice(0, 50)
-  });
-
   if (startNode && endNode) {
     const range = document.createRange();
     range.setStart(startNode, startOffset);
@@ -232,37 +211,14 @@ function findCrossNodeRange(
     // Must be exact match - no extra characters
     const isValid = rangeTrimmed === normalizedTerm;
     
-    console.log("[DEBUG findCrossNodeRange Validation]", {
-      rangeCreated: true,
-      rangeText,
-      rangeNormalized,
-      rangeTrimmed,
-      expectedNormalized: normalizedTerm,
-      isValid,
-      rangeLength: rangeText.length,
-      expectedLength: rawTerm.length,
-      startOffset,
-      endOffset
-    });
-    
     // Only return range if it's valid (exact match)
     if (isValid) {
       return range;
     } else {
-      console.warn("[Docs Summarizer] findCrossNodeRange created invalid range (contains extra characters), returning null", {
-        rangeText,
-        expectedTerm: rawTerm,
-        rangeTrimmed,
-        normalizedTerm
-      });
+      // Range contains extra characters, return null
       return null;
     }
   }
-
-  console.log("[DEBUG findCrossNodeRange]", {
-    rangeCreated: false,
-    reason: !startNode ? "startNode not found" : "endNode not found"
-  });
 
   return null;
 }
@@ -387,16 +343,10 @@ export function findPageMatchElement(term: string): HTMLElement | null {
         // If it's hidden or not scrollable, continue searching in main content
         if (!isElementScrollable(second)) {
             foundHiddenNavMatch = true;
-            console.warn(
-                "[Docs Summarizer] Found nav/TOC match for term but element is not scrollable/visible:",
-                term,
-                second,
-                "Continuing search in main content..."
-            );
+            // Found nav/TOC match but element is not scrollable/visible, continuing search in main content
             // Don't return null - continue to search in main content areas
             // The phrase might exist in both nav and main content
         } else {
-            console.warn("[Docs Summarizer] Using nav/TOC match for term:", term, second);
             return second;
         }
     }
@@ -412,7 +362,6 @@ export function findPageMatchElement(term: string): HTMLElement | null {
             );
             const mainMatch = pickBestMatch(mainNodes, false);
             if (mainMatch && isElementScrollable(mainMatch)) {
-                console.log("[Docs Summarizer] Found main content match after rejecting hidden nav match:", term, mainMatch);
                 return mainMatch;
             }
         }
@@ -442,7 +391,6 @@ export function findPageMatchElement(term: string): HTMLElement | null {
             );
             const bestHeading = inMain.length > 0 ? inMain[0] : headingNodes[0];
             if (bestHeading && isElementScrollable(bestHeading)) {
-                console.log("[Docs Summarizer] Found heading match in main content:", term, bestHeading);
                 return bestHeading;
             }
         }
@@ -491,32 +439,14 @@ export function findPageMatchElement(term: string): HTMLElement | null {
             return thisLen < bestLen ? el : best;
         });
 
-        console.log("[Docs Summarizer] Found match in container element:", {
-            term,
-            element: best,
-            tagName: best.tagName
-        });
-
         // Verify it's scrollable
         if (isElementScrollable(best)) {
             return best;
-        } else {
-            // Found in container but not scrollable - might be collapsed/hidden
-            console.warn(
-                "[Docs Summarizer] Found phrase in container but element is not scrollable (may be collapsed/hidden):",
-                term,
-                best
-            );
         }
     }
 
     // Final check: if we found the phrase in page text but no scrollable element,
     // it might be in collapsed/hidden content (common in SPAs)
-    console.warn("[Docs Summarizer] No scrollable element match found for term:", term);
-    console.warn(
-        "[Docs Summarizer] This phrase exists in the page HTML but may be in collapsed/hidden content. " +
-        "Try expanding navigation sections or tabs if available."
-    );
     return null;
 }
 
@@ -552,11 +482,8 @@ export function clearAllHighlights(): void {
  *  - If that fails (phrase crosses links/nodes), highlight the whole element instead
  */
 export async function scrollToPageMatch(term: string): Promise<void> {
-  console.log("[Docs Summarizer] scrollToPageMatch called", { term });
-
   let rawTerm = term.trim();
   if (!rawTerm) {
-    console.warn("[Docs Summarizer] Empty scroll term received");
     return;
   }
 
@@ -565,13 +492,6 @@ export async function scrollToPageMatch(term: string): Promise<void> {
   // We'll match the core phrase and extend the range to include punctuation if it exists
   const originalTerm = rawTerm;
   rawTerm = rawTerm.replace(/[.,;:!?)\]]+$/, "").trim();
-  
-  if (rawTerm !== originalTerm) {
-    console.log("[Docs Summarizer] Stripped trailing punctuation from scroll term", {
-      original: originalTerm,
-      stripped: rawTerm
-    });
-  }
 
   // Normalize term once for consistent use
   const normalizedTerm = normalizeTextForMatchingCaseInsensitive(rawTerm);
@@ -604,29 +524,8 @@ export async function scrollToPageMatch(term: string): Promise<void> {
   const exactMatch = normalizedPageText.includes(normalizedTerm);
   const lenientMatch = ultraNormalizedPageText.includes(ultraNormalizedTerm);
 
-  // DEBUG: Log phase 1 - validation
-  console.log("[DEBUG Phase 1: Validation]", {
-    rawTerm,
-    normalizedTerm,
-    normalizedTermLength: normalizedTerm.length,
-    pageTextLength: normalizedPageText.length,
-    exactMatch,
-    lenientMatch,
-    pageTextSample: normalizedPageText.slice(0, 500),
-    searchResult: exactMatch 
-      ? `Found at index ${normalizedPageText.indexOf(normalizedTerm)}`
-      : "NOT FOUND"
-  });
-
   if (!exactMatch && !lenientMatch) {
-    console.warn(
-      "[Docs Summarizer] Scroll term not found in full page text (even with normalization):",
-      rawTerm,
-      "Page text length:",
-      normalizedPageText.length,
-      "Sample:",
-      normalizedPageText.slice(0, 200)
-    );
+    // Scroll term not found in full page text
     await showAlert(
       "Docs Summarizer could not find that phrase on this page.\n\n" +
         "The model may have referenced text that is not actually present " +
@@ -641,35 +540,7 @@ export async function scrollToPageMatch(term: string): Promise<void> {
 
   const originalTarget = findPageMatchElement(rawTerm);
   
-  // DEBUG: Log phase 2 - element finding
-  if (originalTarget) {
-    const elementText = originalTarget.innerText || originalTarget.textContent || "";
-    const elementNormalized = normalizeTextForMatchingCaseInsensitive(elementText);
-    const containsPhrase = elementNormalized.includes(normalizedTerm);
-    
-    console.log("[DEBUG Phase 2: Element Finding]", {
-      elementFound: true,
-      elementTag: originalTarget.tagName,
-      elementId: originalTarget.id,
-      elementClass: originalTarget.className,
-      elementTextLength: elementText.length,
-      elementTextSample: elementText.slice(0, 300),
-      elementNormalizedSample: elementNormalized.slice(0, 300),
-      containsPhrase,
-      phraseIndex: containsPhrase ? elementNormalized.indexOf(normalizedTerm) : -1
-    });
-  } else {
-    console.log("[DEBUG Phase 2: Element Finding]", {
-      elementFound: false,
-      reason: "findPageMatchElement returned null"
-    });
-  }
-  
   if (!originalTarget) {
-    console.warn(
-      "[Docs Summarizer] No page match found for scroll target:",
-      rawTerm
-    );
     
     // Check if phrase exists in page text
     const phraseInPageText = normalizedPageText.includes(normalizedTerm);
@@ -710,15 +581,7 @@ export async function scrollToPageMatch(term: string): Promise<void> {
           
           if (isHidden || isCollapsed || hasAriaHidden || parentHidden || hasCollapsedClass) {
             foundInCollapsedContent = true;
-            console.log("[Docs Summarizer] Found phrase in collapsed/hidden element:", {
-              term: rawTerm,
-              element: el,
-              isHidden,
-              isCollapsed,
-              hasAriaHidden,
-              parentHidden,
-              hasCollapsedClass
-            });
+            // Found phrase in collapsed/hidden element
             break;
           }
         }
@@ -772,21 +635,8 @@ export async function scrollToPageMatch(term: string): Promise<void> {
         const thisLen = getText(el).length;
         return thisLen < bestLen ? el : best;
       });
-      console.log(
-        "[Docs Summarizer] Refined fallback target to child element",
-        {
-          term: rawTerm,
-          originalTarget,
-          refinedTarget: target,
-        }
-      );
     }
   }
-
-  console.log("[Docs Summarizer] Using target element for term", {
-    term: rawTerm,
-    target,
-  });
 
   // Scroll the target into view
   target.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -975,7 +825,7 @@ export async function scrollToPageMatch(term: string): Promise<void> {
       }
     } catch (e) {
       // If range creation fails (e.g., invalid offsets), skip this node
-      console.warn("[Docs Summarizer] Range creation failed", e);
+      // Range creation failed, continue to next node
       continue;
     }
 
@@ -1004,12 +854,6 @@ export async function scrollToPageMatch(term: string): Promise<void> {
       
       if (!exactMatch && !matchWithTrailingPeriod) {
         // Span contains more than expected - unwrap it and skip
-        console.warn("[Docs Summarizer] Span contains incorrect text after wrapping, unwrapping", {
-          expected: normalizedTerm,
-          actual: spanTextTrimmed,
-          rawSpanText: spanInnerText,
-          term: rawTerm
-        });
         // Unwrap the span
         const parent = span.parentNode;
         if (parent) {
@@ -1024,16 +868,8 @@ export async function scrollToPageMatch(term: string): Promise<void> {
       
       inlineHighlights.push(span);
       foundInline = true;
-      console.log("[Docs Summarizer] Applied inline highlight", {
-        term: rawTerm,
-        highlightedText: spanInnerText
-      });
       break; // Found in single text node, we're done
     } catch (e) {
-      console.warn(
-        "[Docs Summarizer] Could not highlight phrase inline (may span nodes):",
-        e
-      );
       // Continue to try cross-node matching
     }
   }
@@ -1059,42 +895,12 @@ export async function scrollToPageMatch(term: string): Promise<void> {
       index = targetText.indexOf(normalizedTerm);
     }
     
-    // DEBUG: Log phase 3 - cross-node matching attempt
-    console.log("[DEBUG Phase 3: Cross-Node Matching]", {
-      singleNodeMatchFailed: true,
-      targetTextLength: targetText.length,
-      phraseFoundInTarget: index !== -1,
-      phraseIndex: index,
-      targetTextSample: targetText.slice(Math.max(0, index - 50), index + normalizedTerm.length + 50),
-      matchFound: !!match,
-      matchIndex: match?.index
-    });
+    // Cross-node matching attempt
     
     if (index !== -1) {
       // Find the range that spans across multiple text nodes
       // IMPORTANT: Pass the index in the normalized target text, which should match the normalized term exactly
       const range = findCrossNodeRange(target, normalizedTerm, index, rawTerm);
-      
-      // DEBUG: Log range creation details
-      if (range) {
-        const rangeText = range.toString();
-        console.log("[DEBUG Phase 3: Range Created]", {
-          rangeFound: true,
-          startContainer: range.startContainer.nodeName,
-          startOffset: range.startOffset,
-          endContainer: range.endContainer.nodeName,
-          endOffset: range.endOffset,
-          rangeText,
-          rangeTextLength: rangeText.length,
-          expectedTerm: rawTerm,
-          rangeMatches: normalizeTextForMatchingCaseInsensitive(rangeText) === normalizedTerm
-        });
-      } else {
-        console.log("[DEBUG Phase 3: Range Creation]", {
-          rangeFound: false,
-          reason: "findCrossNodeRange returned null"
-        });
-      }
       
       if (range) {
         const span = document.createElement("span");
@@ -1142,12 +948,6 @@ export async function scrollToPageMatch(term: string): Promise<void> {
           
           if (!exactMatch && !matchWithTrailingPeriod) {
             // Span contains more than expected - unwrap it and skip
-            console.warn("[Docs Summarizer] Cross-node span contains incorrect text after wrapping, unwrapping", {
-              expected: normalizedTerm,
-              actual: spanTextTrimmed,
-              rawSpanText: spanInnerText,
-              term: rawTerm
-            });
             // Unwrap the span
             const parent = span.parentNode;
             if (parent) {
@@ -1160,12 +960,9 @@ export async function scrollToPageMatch(term: string): Promise<void> {
           } else {
             inlineHighlights.push(span);
             foundInline = true;
-            console.log("[Docs Summarizer] Applied cross-node inline highlight", {
-              term: rawTerm,
-              highlightedText: spanInnerText
-            });
           }
         } catch (e) {
+          // Error handling for range operations
           const errorDetails = {
             errorType: e?.constructor?.name || typeof e,
             errorMessage: e instanceof Error ? e.message : String(e),
@@ -1186,14 +983,7 @@ export async function scrollToPageMatch(term: string): Promise<void> {
               : undefined
           };
           
-          console.error(
-            "[DEBUG Phase 3: Range.surroundContents Error]",
-            errorDetails
-          );
-          console.warn(
-            "[Docs Summarizer] Could not highlight phrase across nodes:",
-            e instanceof Error ? e.message : String(e)
-          );
+          // Error logged but not shown to user to avoid console spam
         }
       }
     }
@@ -1202,18 +992,6 @@ export async function scrollToPageMatch(term: string): Promise<void> {
   // Always highlight the whole block so the user clearly sees "look here"
   target.classList.add("docs-summarizer-page-highlight");
   blockHighlights.push(target);
-
-  if (!foundInline) {
-    console.log(
-      "[Docs Summarizer] Applied block highlight only (fallback)",
-      { term: rawTerm }
-    );
-  } else {
-    console.log(
-      "[Docs Summarizer] Applied inline + block highlight",
-      { term: rawTerm }
-    );
-  }
 }
 
 

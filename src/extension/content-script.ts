@@ -466,17 +466,11 @@ function attemptDrawerInjection(): void {
     attempt++;
     
     if (attempt > maxAttempts) {
-      console.warn("[Docs Summarizer] Failed to inject drawer after", maxAttempts, "attempts. Body state:", {
-        bodyExists: !!document.body,
-        bodyChildren: document.body?.children.length || 0,
-        bodyTextLength: document.body?.textContent?.trim().length || 0,
-        readyState: document.readyState,
-      });
+      // Failed to inject drawer after max attempts - page may not be ready
       return;
     }
 
     if (isPageReadyForInjection()) {
-      console.log("[Docs Summarizer] Successfully injected drawer on attempt", attempt);
       createDrawerUI();
       return;
     }
@@ -558,7 +552,6 @@ function initializeDrawerInjection(): void {
     const bodyObserver = new MutationObserver(() => {
       if (document.body) {
         bodyObserver.disconnect();
-        console.log("[Docs Summarizer] Body now exists, initializing drawer injection. Ready state:", document.readyState);
         attemptDrawerInjection();
         setupContentWatcher();
         setupDrawerWatcher(); // Watch for drawer removal
@@ -574,7 +567,6 @@ function initializeDrawerInjection(): void {
     setTimeout(() => {
       if (document.body) {
         bodyObserver.disconnect();
-        console.log("[Docs Summarizer] Body exists after delay, initializing drawer injection");
         attemptDrawerInjection();
         setupContentWatcher();
         setupDrawerWatcher();
@@ -584,8 +576,6 @@ function initializeDrawerInjection(): void {
     return;
   }
   
-  console.log("[Docs Summarizer] Initializing drawer injection. Ready state:", document.readyState);
-  
   attemptDrawerInjection();
   setupContentWatcher();
   setupDrawerWatcher(); // Watch for drawer removal
@@ -593,16 +583,13 @@ function initializeDrawerInjection(): void {
   // Also listen for DOMContentLoaded if page is still loading
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
-      console.log("[Docs Summarizer] DOMContentLoaded fired, re-attempting injection");
       attemptDrawerInjection();
     });
   }
   
   // Listen for load event as well (for SPAs that finish loading later)
   window.addEventListener("load", () => {
-    console.log("[Docs Summarizer] Window load event fired, checking drawer");
     if (!document.getElementById(DRAWER_ROOT_ID)) {
-      console.log("[Docs Summarizer] Drawer missing after load, re-injecting");
       attemptDrawerInjection();
     }
   });
@@ -635,7 +622,6 @@ function setupDrawerWatcher(): void {
   const checkAndReinject = () => {
     // Only check if we don't already have a drawer
     if (!document.getElementById(DRAWER_ROOT_ID) && document.body) {
-      console.log("[Docs Summarizer] Drawer was removed, re-injecting...");
       attemptDrawerInjection();
     }
   };
@@ -654,7 +640,6 @@ function setupDrawerWatcher(): void {
             if (node.nodeType === Node.ELEMENT_NODE) {
               const element = node as HTMLElement;
               if (element.id === DRAWER_ROOT_ID || element.querySelector(`#${DRAWER_ROOT_ID}`)) {
-                console.log("[Docs Summarizer] Drawer removed via MutationObserver, re-injecting");
                 if (intervalId) clearInterval(intervalId);
                 attemptDrawerInjection();
                 return;
@@ -673,7 +658,7 @@ function setupDrawerWatcher(): void {
     }
   } catch (e) {
     // If MutationObserver fails (e.g., in some test environments), just use interval
-    console.warn("[Docs Summarizer] MutationObserver setup failed, using interval only:", e);
+    // Fallback to interval-based checking
   }
   
   // Clean up after 60 seconds (to avoid memory leaks, but give enough time for SPAs)

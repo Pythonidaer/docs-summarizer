@@ -69,12 +69,9 @@ describe("exportMessageAsMarkdown", () => {
       text: "User question",
     };
 
-    const consoleSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
     exportMessageAsMarkdown(msg);
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "[Docs Summarizer] Can only export assistant messages"
-    );
+    // Should return early without creating download link
     expect(createElementSpy).not.toHaveBeenCalledWith("a");
   });
 
@@ -140,12 +137,9 @@ describe("exportMessageAsPDF", () => {
       text: "User question",
     };
 
-    const consoleSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
     exportMessageAsPDF(msg);
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "[Docs Summarizer] Can only export assistant messages"
-    );
+    // Should return early without opening print window
     expect(openSpy).not.toHaveBeenCalled();
   });
 
