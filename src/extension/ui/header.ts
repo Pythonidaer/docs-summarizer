@@ -5,6 +5,7 @@ export function createHeader(): {
   closeButton: HTMLButtonElement;
   deleteKeyButton: HTMLButtonElement;
   infoButton: HTMLButtonElement;
+  donateButton: HTMLButtonElement;
 } {
   const header = document.createElement("div");
   Object.assign(header.style, {
@@ -111,6 +112,127 @@ export function createHeader(): {
   leftContainer.appendChild(deleteKeyButton);
   leftContainer.appendChild(infoButton);
 
+  // Container for Donate and Close buttons (right side)
+  const rightContainer = document.createElement("div");
+  Object.assign(rightContainer.style, {
+    display: "flex",
+    alignItems: "center",
+    gap: CURSOR_SPACING.sm, // Gap between Donate and Close buttons
+  } as CSSStyleDeclaration);
+
+  // Money bag icon button (donate) - expands on hover to show "Donate" text
+  const donateButton = document.createElement("button");
+  donateButton.title = "Support & Connect";
+  
+  // Emoji is always on the right, fixed position
+  const donateEmoji = document.createElement("span");
+  donateEmoji.textContent = "💰";
+  donateEmoji.className = "donate-icon";
+  Object.assign(donateEmoji.style, {
+    fontSize: "16px",
+    lineHeight: "1",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "24px",
+    height: "24px",
+    flexShrink: "0",
+    flexGrow: "0",
+    position: "absolute",
+    right: "0",
+  } as CSSStyleDeclaration);
+  
+  // Text appears on the left when expanding (completely hidden initially)
+  const donateText = document.createElement("span");
+  donateText.textContent = "Donate";
+  donateText.className = "donate-text";
+  Object.assign(donateText.style, {
+    fontSize: CURSOR_TYPOGRAPHY.fontSize.sm,
+    fontFamily: CURSOR_TYPOGRAPHY.fontFamily,
+    whiteSpace: "nowrap",
+    paddingRight: "4px", // Space between text and emoji
+    paddingLeft: "0",
+    opacity: "0", // Start invisible
+    display: "flex", // Use flex for better centering
+    alignItems: "center",
+    margin: "0",
+    marginLeft: "0", // Will be centered using flexbox
+    transition: "opacity 0.3s ease-out",
+    pointerEvents: "none", // Don't interfere with button clicks when invisible
+    flex: "1", // Take up available space
+    justifyContent: "center", // Center text within its space
+  } as CSSStyleDeclaration);
+  
+  // Add text first (left), then emoji (right) - emoji is absolutely positioned on right
+  donateButton.appendChild(donateText);
+  donateButton.appendChild(donateEmoji);
+  
+  Object.assign(donateButton.style, {
+    border: "none",
+    background: CURSOR_COLORS.buttonSecondary,
+    color: CURSOR_COLORS.textPrimary,
+    cursor: "pointer",
+    height: "24px", // Same height as close button
+    width: "24px", // Fixed width to match close button exactly
+    borderRadius: "50%", // Perfect circle initially
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center", // Center emoji initially (since it's the only visible element)
+    overflow: "hidden",
+    transition: "background-color 0.2s, width 0.4s ease-out, border-radius 0.4s ease-out", // Slower animation
+    padding: "0",
+    position: "relative",
+  } as CSSStyleDeclaration);
+
+  let hoverTimeout: NodeJS.Timeout | null = null;
+
+  // Hover effect - expand to show "Donate" text on the left, emoji stays on right
+  donateButton.addEventListener("mouseenter", () => {
+    // Clear any pending hide timeout
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout);
+      hoverTimeout = null;
+    }
+    
+    // Expand button first, then fade in text
+    donateButton.style.background = CURSOR_COLORS.buttonSecondaryHover;
+    donateButton.style.width = "90px"; // Narrower - just enough for text + emoji + padding
+    donateButton.style.borderRadius = "9999px"; // Pill-shaped when expanded
+    donateButton.style.paddingLeft = "0"; // No padding on button
+    donateButton.style.justifyContent = "flex-start"; // Align to start
+    
+    // Use flexbox to center text: text takes flex: 1, emoji has fixed width
+    // This will automatically center the text in the remaining space
+    donateText.style.marginLeft = "0"; // No margin needed, flexbox handles centering
+    
+    // Fade in text after button starts expanding (small delay)
+    setTimeout(() => {
+      donateText.style.opacity = "1";
+      donateText.style.pointerEvents = "auto";
+    }, 50);
+  });
+  
+  donateButton.addEventListener("mouseleave", () => {
+    // Clear any pending show timeout
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout);
+    }
+    
+    // Fade out text first
+    donateText.style.opacity = "0";
+    donateText.style.pointerEvents = "none";
+    
+    // Then shrink button after fade completes
+    hoverTimeout = setTimeout(() => {
+      donateButton.style.background = CURSOR_COLORS.buttonSecondary;
+      donateButton.style.width = "24px"; // Back to circle size
+      donateButton.style.borderRadius = "50%"; // Back to circle
+      donateButton.style.justifyContent = "center"; // Center emoji when collapsed
+      donateText.style.marginLeft = "0"; // Reset margin when collapsed
+      hoverTimeout = null;
+    }, 300); // Wait for fade transition to complete (0.3s)
+  });
+
   const closeButton = document.createElement("button");
   closeButton.textContent = "×";
   Object.assign(closeButton.style, {
@@ -138,8 +260,11 @@ export function createHeader(): {
     closeButton.style.background = CURSOR_COLORS.buttonSecondary; // Return to default
   });
 
-  header.appendChild(leftContainer);
-  header.appendChild(closeButton);
+  rightContainer.appendChild(donateButton);
+  rightContainer.appendChild(closeButton);
 
-  return { header, closeButton, deleteKeyButton, infoButton };
+  header.appendChild(leftContainer);
+  header.appendChild(rightContainer);
+
+  return { header, closeButton, deleteKeyButton, infoButton, donateButton };
 }

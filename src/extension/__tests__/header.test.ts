@@ -3,8 +3,8 @@
 import { createHeader } from "../ui/header";
 
 describe("createHeader", () => {
-  test("creates header with delete key button, info button, and close button", () => {
-    const { header, closeButton, deleteKeyButton, infoButton } = createHeader();
+  test("creates header with delete key button, info button, donate button, and close button", () => {
+    const { header, closeButton, deleteKeyButton, infoButton, donateButton } = createHeader();
 
     expect(header).toBeInstanceOf(HTMLDivElement);
     expect(closeButton).toBeInstanceOf(HTMLButtonElement);
@@ -13,6 +13,7 @@ describe("createHeader", () => {
     expect(header.contains(closeButton)).toBe(true);
     expect(header.contains(deleteKeyButton)).toBe(true);
     expect(header.contains(infoButton)).toBe(true);
+    expect(header.contains(donateButton)).toBe(true);
   });
 
   test("header has correct styling", () => {
@@ -27,8 +28,8 @@ describe("createHeader", () => {
     expect(header.style.borderBottom).toMatch(/rgba\(255,\s*255,\s*255,\s*0\.12\)/);
   });
 
-  test("header contains delete key button, info button, and close button", () => {
-    const { header, deleteKeyButton, infoButton, closeButton } = createHeader();
+  test("header contains delete key button, info button, donate button, and close button", () => {
+    const { header, deleteKeyButton, infoButton, donateButton, closeButton } = createHeader();
 
     // Should have left container and close button (2 children)
     expect(header.children.length).toBe(2);
@@ -39,8 +40,11 @@ describe("createHeader", () => {
     const leftContainer = header.children[0] as HTMLElement;
     expect(leftContainer.contains(deleteKeyButton)).toBe(true);
     expect(leftContainer.contains(infoButton)).toBe(true);
-    // Close button should be second (right side)
-    expect(header.children[1]).toBe(closeButton);
+    // Right container should be second, containing donate and close buttons
+    const rightContainer = header.children[1] as HTMLDivElement;
+    expect(rightContainer).toBeInstanceOf(HTMLDivElement);
+    expect(rightContainer.contains(donateButton)).toBe(true);
+    expect(rightContainer.contains(closeButton)).toBe(true);
   });
 
   test("close button has correct styling and text", () => {

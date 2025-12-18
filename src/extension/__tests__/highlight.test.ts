@@ -242,7 +242,9 @@ describe("scrollToPageMatch - edge cases", () => {
     await scrollToPageMatch("phrase that does not exist");
 
     expect(mockShowAlert).toHaveBeenCalled();
-    expect(mockShowAlert.mock.calls[0]?.[0]).toContain("could not find that phrase");
+    const errorMessage = mockShowAlert.mock.calls[0]?.[0] || "";
+    // Error message should indicate phrase not found (for phrases that don't exist in page text)
+    expect(errorMessage).toMatch(/couldn't find|could not find|doesn't match exactly|may have referenced/i);
   });
 
   test("prefers main content over navigation", () => {
@@ -497,6 +499,8 @@ describe("findPageMatchElement - nav/TOC visibility check", () => {
 
     // Should show error because nav match is hidden
     expect(mockShowAlert).toHaveBeenCalled();
-    expect(mockShowAlert.mock.calls[0]?.[0]).toContain("could not find that phrase");
+    const errorMessage = mockShowAlert.mock.calls[0]?.[0] || "";
+    // Error message should indicate phrase not found or exists but is hidden
+    expect(errorMessage).toMatch(/couldn't find|exists on this page|phrase you're looking for/i);
   });
 });

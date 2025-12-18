@@ -9,6 +9,7 @@ export type PromptVoiceId =
   | "socratic"
   | "in_depth"
   | "mla_essay"
+  | "apa_essay"
   | "technical_report"
   | "research_abstract"
   | "retrieval_coach"
@@ -138,7 +139,8 @@ Citation format:
 - Place citation numbers immediately after the referenced claim or phrase, not at the end of paragraphs.
 - Each unique page section should get its own citation number. You may reuse the same citation number multiple times if referencing the same section.
 - At the end of your response, include a single "References" section listing each unique citation number exactly once.
-- Each reference entry should be formatted as: [1] [link text](#scroll:target phrase)
+- Each reference entry should be formatted as: [1] [actual phrase from page](#scroll:target phrase)
+- CRITICAL: The link label (text inside square brackets) MUST be the actual phrase from the page, NOT placeholder text like "link", "linked text", or "click here". Use the same phrase for both the label and the #scroll: target.
 - DO NOT duplicate the link text before the link (e.g., avoid "link text link text" - only include the link).
 - DO NOT create duplicate reference sections or include plain text references without links.
 - DO NOT add inline scroll links at the end of paragraphs—use citation numbers instead.
@@ -168,6 +170,63 @@ Guidelines:
 - Paragraphs may be longer (3–5 sentences) to develop ideas fully.
 - DO NOT label paragraphs as "Body Paragraph 1", "Body Paragraph 2", etc. Simply write the paragraphs naturally without numbering or explicit labels.
 - Use section headings only when they add clarity (e.g., "Introduction", "Conclusion"), not for every body paragraph.
+`.trim(),
+  },
+  {
+    id: "apa_essay",
+    label: "APA Essay",
+    description: "Academic essay with APA-style citations and references.",
+    instructions: `
+Write in a formal, academic tone following APA (American Psychological Association) style guidelines.
+
+CRITICAL FORMATTING REQUIREMENT:
+- You MUST write in paragraph form ONLY. Do NOT use bullet points, numbered lists, or any list format in the body of the essay.
+- All content must be presented as continuous prose in paragraph form.
+- Use multiple paragraphs under section headings rather than bullet points.
+- The ONLY exception is the References section at the end, which uses a specific format.
+
+Structure:
+- Start with an **Introduction** that presents the topic and states the main thesis or research question. Write this as one or more paragraphs.
+- Follow with body paragraphs that each develop one supporting idea with evidence. Each section should contain multiple paragraphs, not bullet points.
+- End with a **Conclusion** that synthesizes key points and may suggest implications or future directions. Write this as one or more paragraphs.
+
+Citation Format (APA Style):
+- When referencing content from the page, you MUST use in-text citations in parenthetical format with scroll links.
+- Format citations as clickable links: [(Author, Year)](#scroll:target phrase) or [(Author, Year, para. X)](#scroll:target phrase) where "target phrase" is the exact phrase from the page that supports the claim.
+- If no author is available from the page content, use: [("Documentation Title", Year)](#scroll:target phrase) or [(Source, n.d.)](#scroll:target phrase) for no date.
+- Place citation links immediately after the referenced claim or phrase, before any punctuation.
+- For direct quotations or specific claims, include paragraph numbers when available: [(Author, Year, para. 3)](#scroll:target phrase).
+- Use "and" when citing two authors: [(Author1 & Author2, Year)](#scroll:target phrase).
+- Use "et al." when citing three or more authors: [(Author1 et al., Year)](#scroll:target phrase).
+- CRITICAL: The author name or title used in citations should logically reference the page being summarized (e.g., use "MDN Web Docs", "Documentation", "Wikipedia", or the page title).
+- CRITICAL: Each citation link MUST use the exact phrase from the page as the scroll target. The citation text should match the author/source format, but the scroll target should be the actual supporting phrase from the page.
+- Include citation links throughout your paragraphs, not just at the end. Cite specific claims, facts, and concepts as you present them.
+- Every major claim or fact from the page should be cited with a scroll link.
+
+References Section:
+- At the end of your response, include a single **References** section formatted in APA style.
+- List each unique citation that appears in your in-text citations exactly once.
+- Each reference entry should follow APA format for web sources:
+  Author, A. A. (Year, Month Day). Title of webpage. Website Name. URL
+- If author is not available: Title of webpage. (Year, Month Day). Website Name. URL
+- If date is not available: Author, A. A. (n.d.). Title of webpage. Website Name. URL
+- After each reference entry, include relevant scroll links to specific sections using the format: [actual phrase from page](#scroll:target phrase)
+- CRITICAL: The link label (text inside square brackets) MUST be the actual phrase from the page, NOT placeholder text like "link" or "click here". Use the same phrase for both the label and the #scroll: target.
+- DO NOT duplicate link text before the link.
+- CRITICAL: Every in-text citation (Author, Year) used in your paragraphs must have a corresponding entry in the References section.
+
+Guidelines:
+- CRITICAL: Write ALL content in paragraph form. NEVER use bullet points (•), numbered lists (1., 2., 3.), dashes (-), or any list formatting in the body of the essay.
+- When you have multiple points to make under a heading, write them as separate paragraphs, not as bullet points.
+- Use clear topic sentences for each major paragraph.
+- Avoid slang; keep the style precise and formal.
+- Write in third person when appropriate (e.g., "The research indicates..." rather than "I found...").
+- Paragraphs may be longer (3–5 sentences) to develop ideas fully.
+- Use active voice when possible for clarity.
+- DO NOT label paragraphs as "Body Paragraph 1", "Body Paragraph 2", etc. Simply write the paragraphs naturally.
+- Use section headings only when they add clarity (e.g., "Introduction", major topic sections, "Conclusion"), not for every body paragraph.
+- Maintain objectivity and avoid personal opinions unless explicitly requested.
+- If you find yourself wanting to create a list, instead write multiple paragraphs, each developing one idea in detail.
 `.trim(),
   },
   {

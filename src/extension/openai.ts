@@ -110,6 +110,8 @@ export function buildInputForConversation(
         : msg.text;
       lines.push(`${prefix}: ${messageText}`);
     }
+    lines.push("");
+    lines.push("CRITICAL REMINDER: When creating #scroll: links, you MUST ONLY reference phrases from the PAGE CONTENT section above, NEVER from your own previous responses. Your previous responses are shown for context only—do not create scroll links to phrases you mentioned in those responses.");
   }
 
   lines.push("");

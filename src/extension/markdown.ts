@@ -75,7 +75,37 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
   for (const match of filteredMatches) {
     // Text before the match
     if (match.start > lastIndex) {
-      const before = text.slice(lastIndex, match.start);
+      let before = text.slice(lastIndex, match.start);
+      
+      // IMPROVED: Remove duplicate text that matches the link label (with better normalization)
+      // This prevents redundant text like "phrase. [phrase.)](#scroll:...)" → just "[phrase.)](#scroll:...)"
+      if (match.type === "link" && before.trim()) {
+        const rawLabel = match.linkLabel ?? "";
+        
+        // More aggressive normalization: remove all trailing punctuation for comparison
+        // This catches cases like "phrase. " matching "phrase.)"
+        const normalizeForComparison = (str: string): string => {
+          return str
+            .trim()
+            .toLowerCase()
+            // Remove all trailing punctuation marks (periods, commas, closing parens, etc.)
+            .replace(/[.,;:!?)\]\}]+$/, "")
+            // Normalize whitespace
+            .replace(/\s+/g, " ")
+            .trim();
+        };
+        
+        const normalizedBefore = normalizeForComparison(before);
+        const normalizedLabel = normalizeForComparison(rawLabel);
+        
+        // Check if the normalized text before matches the normalized label
+        // Also check if the before text is a prefix of the label (handles partial matches)
+        if (normalizedBefore === normalizedLabel || 
+            (normalizedLabel.startsWith(normalizedBefore) && normalizedBefore.length > 10)) {
+          before = ""; // Don't render the duplicate text
+        }
+      }
+      
       if (before) {
         container.appendChild(document.createTextNode(before));
       }
@@ -156,19 +186,21 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
       label = cleanedWords.join(" ").trim();
     }
     
-    // Clean up trailing punctuation that might be duplicated (e.g., "SS))" → "SS)")
-    // Remove duplicate closing parentheses, brackets, quotes, or periods at the end
+    // IMPROVED: More comprehensive trailing punctuation cleanup
+    // Handle cases like "(UI)..)" -> "(UI)." or "(UI))" -> "(UI)"
+    // First, normalize multiple trailing periods and closing parens together
+    // Pattern: one or more periods, optional space, one or more closing parens
+    label = label.replace(/\.+\s*\)+$/, ".");
+    
+    // Then handle duplicate closing punctuation at the end
     label = label.replace(/([)\]"'`.,;:!?])\1+$/, "$1");
     
-    // Additional cleanup: remove orphaned trailing punctuation that might be left after duplicate removal
-    // e.g., "Hook in React 19)" → "Hook in React 19" (if the ) was part of a duplicate)
-    // Also handles cases like "cells. )" → "cells." (orphaned closing paren after period)
-    // This is a heuristic: if we have trailing punctuation after a space, it might be leftover
+    // Remove orphaned trailing punctuation after spaces
     label = label.replace(/\s+([)\]"'`.,;:!?])+$/, "");
     
-    // Final cleanup: remove any trailing period followed by closing paren (e.g., "cells. )" → "cells.")
-    // This handles the specific case where we have ". )" at the end
-    label = label.replace(/\.\s*\)+$/, ".");
+    // Handle the specific pattern of periods followed by closing parens more carefully
+    // Match patterns like ". )", "..)", ".)", etc. and normalize to just "."
+    label = label.replace(/\.+\s*\)+$/, ".");
 
     const HASH_PREFIX = "#scroll:";
     const PLAIN_PREFIX = "scroll:";
@@ -238,18 +270,108 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
           } else {
             // Phrase exists - render as clickable link
             const a = document.createElement("a");
-            a.textContent = label;
+            
+            // IMPROVED: Consolidated and more robust label cleaning
+            // Create a single, comprehensive cleaning function
+            let cleanLabel = label.trim();
+            
+            // Step 1: Strip leading punctuation and whitespace
+            cleanLabel = cleanLabel.replace(/^[.,;:!?\s]+/, "").trim();
+            
+            // Step 2: Handle trailing periods and closing parens together
+            // Pattern: one or more periods, optional space, one or more closing parens
+            // Replace with just a single period if there were periods, otherwise remove
+            cleanLabel = cleanLabel.replace(/\.+\s*\)+$/, ".");
+            
+            // Step 3: Handle punctuation before excess closing parens
+            cleanLabel = cleanLabel.replace(/[,;:!?]\s*\)+$/, (match) => {
+              // Keep the punctuation mark but remove excess closing parens
+              return match[0] ?? "";
+            });
+            
+            // Step 4: Balance parentheses - remove excess closing parens
+            while (cleanLabel.endsWith(")")) {
+              const openParenCount = (cleanLabel.match(/\(/g) || []).length;
+              const closeParenCount = (cleanLabel.match(/\)/g) || []).length;
+              if (closeParenCount <= openParenCount) break;
+              cleanLabel = cleanLabel.slice(0, -1).trim();
+            }
+            
+            // Step 5: Balance brackets
+            while (cleanLabel.endsWith("]")) {
+              const openBracketCount = (cleanLabel.match(/\[/g) || []).length;
+              const closeBracketCount = (cleanLabel.match(/\]/g) || []).length;
+              if (closeBracketCount <= openBracketCount) break;
+              cleanLabel = cleanLabel.slice(0, -1).trim();
+            }
+            
+            // Step 6: Handle duplicate trailing punctuation
+            cleanLabel = cleanLabel.replace(/([)\]"'`.,;:!?])\1+$/, "$1");
+            
+            // Step 7: Remove orphaned punctuation after spaces
+            cleanLabel = cleanLabel.replace(/\s+([)\]"'`.,;:!?])+$/, "");
+            
+            // Step 8: Conditional trailing punctuation removal
+            // Preserve periods after balanced parentheses like "(UI)." if that matches page text
+            // Otherwise, strip trailing punctuation more aggressively
+            if (cleanLabel.match(/\([^)]+\)\.$/)) {
+              // Ends with balanced parens + period - keep it, only strip other punctuation
+              cleanLabel = cleanLabel.replace(/[,;:!?]+$/, "").trim();
+            } else {
+              // Strip all trailing punctuation except if it's part of balanced parens
+              // Be more careful: only strip if there's clearly excess punctuation
+              // Don't strip if it would break balanced parentheses
+              const beforePunct = cleanLabel.replace(/[.,;:!?]+$/, "");
+              const openBefore = (beforePunct.match(/\(/g) || []).length;
+              const closeBefore = (beforePunct.match(/\)/g) || []).length;
+              if (openBefore === closeBefore) {
+                // Safe to strip - parens are balanced
+                cleanLabel = cleanLabel.replace(/[.,;:!?]+$/, "").trim();
+              }
+            }
+            
+            // Step 9: Final safety - remove any remaining single trailing letters
+            cleanLabel = cleanLabel.replace(/\s+[A-Za-z]\s*$/, "").trim();
+            
+            // Step 10: Final paren balance check
+            while (cleanLabel.endsWith(")")) {
+              const openParenCount = (cleanLabel.match(/\(/g) || []).length;
+              const closeParenCount = (cleanLabel.match(/\)/g) || []).length;
+              if (closeParenCount <= openParenCount) break;
+              cleanLabel = cleanLabel.slice(0, -1).trim();
+            }
+            
+            // Step 11: Final punctuation cleanup (preserve balanced parens + period pattern)
+            if (cleanLabel.match(/\([^)]+\)\.$/)) {
+              cleanLabel = cleanLabel.replace(/[,;:!?]+$/, "").trim();
+            } else {
+              cleanLabel = cleanLabel.replace(/[.,;:!?]+$/, "").trim();
+            }
+            
+            a.textContent = cleanLabel;
             a.style.cursor = "pointer";
             a.style.color = "#f97316"; // internal scroll links
             a.style.textDecoration = "underline";
 
-            const termForClick = scrollTerm;
+            // Strip trailing punctuation from the phrase to avoid range boundary issues
+            // This handles cases where punctuation is in a separate text node
+            // We'll match the core phrase and let the range extend naturally
+            // Use the same deterministic loop-based stripping as the label
+            let termForClick = scrollTerm.trim();
+            let previousTerm = "";
+            // Keep stripping until no more trailing punctuation is found
+            while (termForClick !== previousTerm) {
+              previousTerm = termForClick;
+              termForClick = termForClick.replace(/[.,;:!?)\]]+$/, "").trim();
+            }
+            
         a.addEventListener("click", (event) => {
           event.preventDefault();
           console.log("[Docs Summarizer] Scroll link clicked", {
             label,
             href,
             term: termForClick,
+            originalTerm: scrollTerm,
           });
           
           // Check if we're in a detached window (no document.body or different origin)
@@ -305,7 +427,9 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
         });
 
             console.log("[Docs Summarizer] Render scroll link", {
-              label,
+              rawLabel: match.linkLabel,
+              preCleanedLabel: label,
+              finalCleanedLabel: cleanLabel,
               href,
               term: scrollTerm,
             });
@@ -347,9 +471,96 @@ function renderInlineMarkdown(container: HTMLElement, text: string): void {
     }
   }
 
-  // Remaining text after last match
+  // IMPROVED: Clean up any trailing punctuation or duplicate text that might be left after the last link
+  // This handles cases where there's text like ". " or ".)" after a link, or duplicate phrases
   if (lastIndex < text.length) {
-    const tail = text.slice(lastIndex);
+    let tail = text.slice(lastIndex);
+    
+    // Check if the previous match was a link with a scroll target
+    const lastMatch = filteredMatches[filteredMatches.length - 1];
+    if (lastMatch && lastMatch.type === "link" && tail.trim()) {
+      // Check if the tail contains duplicate text from the link's scroll target
+      const href = lastMatch.linkHref ?? "";
+      const HASH_PREFIX = "#scroll:";
+      const PLAIN_PREFIX = "scroll:";
+      let scrollTerm: string | null = null;
+      
+      if (href.startsWith(HASH_PREFIX)) {
+        scrollTerm = href.slice(HASH_PREFIX.length);
+      } else if (href.startsWith(PLAIN_PREFIX)) {
+        scrollTerm = href.slice(PLAIN_PREFIX.length);
+      }
+      
+      if (scrollTerm) {
+        try {
+          scrollTerm = decodeURIComponent(scrollTerm).trim();
+        } catch {
+          scrollTerm = scrollTerm.trim();
+        }
+        
+        // Normalize for comparison
+        const normalizeForComparison = (str: string): string => {
+          return str
+            .trim()
+            .toLowerCase()
+            // Remove all trailing punctuation marks
+            .replace(/[.,;:!?)\]\}]+$/, "")
+            // Normalize whitespace
+            .replace(/\s+/g, " ")
+            .trim();
+        };
+        
+        const normalizedTail = normalizeForComparison(tail);
+        const normalizedScrollTerm = normalizeForComparison(scrollTerm);
+        
+        // Check if the tail is a duplicate or continuation of the scroll term
+        // This handles cases like "[phrase](#scroll:phrase) and phrase" or "[phrase](#scroll:phrase) phrase)"
+        if (normalizedTail === normalizedScrollTerm || 
+            normalizedScrollTerm.endsWith(normalizedTail) ||
+            normalizedTail.startsWith(normalizedScrollTerm)) {
+          // Tail is a duplicate of the scroll term - remove it
+          tail = "";
+        } else {
+          // Check if tail starts with "and " or "or " followed by part of the scroll term
+          // This handles cases like "[phrase](#scroll:phrase) and duplicate phrase"
+          const tailWithConnector = normalizedTail.replace(/^(and|or)\s+/, "");
+          if (tailWithConnector !== normalizedTail) {
+            // Tail starts with "and " or "or "
+            if (normalizedScrollTerm.endsWith(tailWithConnector) || 
+                tailWithConnector === normalizedScrollTerm ||
+                tailWithConnector.startsWith(normalizedScrollTerm)) {
+              // The text after "and"/"or" duplicates the scroll term - remove it
+              tail = "";
+            }
+          }
+        }
+      }
+    }
+    
+    // If the tail is just punctuation or whitespace after a link, we might want to be more careful
+    // But generally, we should render what's there unless it's clearly orphaned
+    
+    // Remove leading whitespace if it's just whitespace
+    if (tail.trim() === "") {
+      tail = ""; // Don't render pure whitespace
+    } else {
+      // Check if the tail starts with punctuation that might be orphaned
+      // If it's just a single period or punctuation mark, it might be leftover
+      const trimmedTail = tail.trim();
+      if (trimmedTail.match(/^[.,;:!?)\]]+$/)) {
+        // It's just punctuation - this might be orphaned from the link
+        // Only remove if the previous match was a link
+        if (lastMatch && lastMatch.type === "link") {
+          // Check if this punctuation might be part of a sentence continuation
+          // If it's just a period, keep it (might be sentence ending)
+          // If it's multiple punctuation marks, it's likely orphaned
+          if (trimmedTail.length > 1 || trimmedTail !== ".") {
+            tail = ""; // Remove orphaned punctuation
+          }
+        }
+      }
+    }
+    
     if (tail) {
       container.appendChild(document.createTextNode(tail));
     }

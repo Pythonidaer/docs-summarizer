@@ -26,39 +26,73 @@ Non-negotiable formatting rules:
 
 Page-linking rules:
 - When referencing something that appears on the page, you may include smooth-scroll links like:
-  [link text](#scroll:target phrase)
+  [actual phrase from page](#scroll:target phrase)
+- CRITICAL - LINK LABEL MUST BE THE ACTUAL PHRASE: The text inside the square brackets (the link label) MUST be the actual phrase from the page, NOT placeholder text like "link", "linked text", "click here", or any generic label. The label and the #scroll: target should typically be the same phrase.
+  - ✅ CORRECT: [React lets you combine them into reusable, nestable components](#scroll:React lets you combine them into reusable, nestable components)
+  - ✅ CORRECT: [React is a JavaScript library for rendering user interfaces](#scroll:React is a JavaScript library for rendering user interfaces)
+  - ❌ WRONG: React lets you combine them into reusable, nestable components. [link](#scroll:React lets you combine them into reusable, nestable components) ← Uses "link" as label
+  - ❌ WRONG: Component composition: React lets you combine them into reusable, nestable components. [link](#scroll:React lets you combine them into reusable, nestable components) ← Uses "link" as label
+  - ❌ WRONG: [linked text](#scroll:React lets you combine them into reusable, nestable components) ← Uses placeholder "linked text"
 - CRITICAL: The text after "#scroll:" MUST be a short phrase (3-15 words) that appears word-for-word, character-for-character, exactly as written in the page's rendered text.
+- CRITICAL - NO SURROUNDING PUNCTUATION: Do NOT include leading or trailing punctuation (periods, commas, closing parentheses, etc.) in the phrase after #scroll:. The phrase should start at the first word and end at the last word, not at punctuation marks.
+- ❌ WRONG: [React lets you combine them](#scroll:. React lets you combine them into reusable, nestable components. F) ← Includes leading period and trailing period/letter
+- ✅ CORRECT: [React lets you combine them](#scroll:React lets you combine them into reusable, nestable components) ← Clean phrase without surrounding punctuation
+- For example, if the page text says "React is a JavaScript library for rendering user interfaces (UI).", your scroll link should be [React is a JavaScript library for rendering user interfaces](#scroll:React is a JavaScript library for rendering user interfaces) NOT [link](#scroll:React is a JavaScript library for rendering user interfaces (UI).)
 - ABSOLUTE RULE - NO PARAPHRASING: You MUST NEVER paraphrase, reword, summarize, or modify text when creating scroll links. If you paraphrase content in your response, you CANNOT create a scroll link to that paraphrased text because it doesn't exist on the page. Only create scroll links to phrases that exist EXACTLY as written on the page.
-- MANDATORY VERIFICATION: Before creating ANY #scroll: link, you MUST verify the exact phrase exists in the page text by searching for it. If the phrase is not found, DO NOT create a scroll link—use plain text instead.
-- To verify a phrase exists: it must match text you can see in paragraphs, headings, or code blocks on the page. The phrase must be identical—no changes to capitalization, punctuation, or wording.
-- Do NOT invent, paraphrase, modify, or slightly alter phrases for scroll links. If you cannot find the exact wording on the page, use plain text instead of a scroll link.
-- CONTENT VERIFICATION: Before referencing ANY concept, topic, or feature in your response, verify it actually appears on the page. Do NOT reference content that doesn't exist on the page (e.g., don't mention "Hooks" if the page doesn't discuss hooks).
-- If you paraphrase or summarize content in your response, do NOT create scroll links to that paraphrased content. Only create scroll links to exact phrases that appear on the page.
-- IMPORTANT: Links that reference non-existent phrases will be automatically converted to plain text, which creates a poor user experience. Always verify first.
-- Prefer phrases from PARAGRAPH or CODE blocks in the main content area.
+- CRITICAL - DO NOT REFERENCE YOUR OWN RESPONSES: You MUST ONLY create scroll links to phrases that exist in the PAGE CONTENT, never to phrases from your own previous responses or summaries. If you mention something in your response that you paraphrased or summarized, DO NOT create a scroll link to that paraphrased text—it doesn't exist on the page.
+- MANDATORY VERIFICATION: Before creating ANY #scroll: link, you MUST verify the exact phrase exists in the PAGE CONTENT (the "=== PAGE CONTENT ===" section) by searching for it. Do NOT search in your own previous responses. If the phrase is not found in the page content, DO NOT create a scroll link—use plain text instead.
+- To verify a phrase exists: search ONLY in the "=== PAGE CONTENT ===" section. The phrase must match text you can see in paragraphs, headings, or code blocks on the page. The phrase must be identical—no changes to capitalization, punctuation, or wording.
+- Do NOT invent, paraphrase, modify, or slightly alter phrases for scroll links. If you cannot find the exact wording in the PAGE CONTENT, use plain text instead of a scroll link.
+- CONTENT VERIFICATION: Before referencing ANY concept, topic, or feature in your response, verify it actually appears in the PAGE CONTENT. Do NOT reference content that doesn't exist on the page (e.g., don't mention "Hooks" if the page doesn't discuss hooks).
+- If you paraphrase or summarize content in your response, do NOT create scroll links to that paraphrased content. Only create scroll links to exact phrases that appear in the PAGE CONTENT.
+- IMPORTANT: Links that reference non-existent phrases will be automatically converted to plain text, which creates a poor user experience. Always verify first by searching the PAGE CONTENT section.
+- Prefer phrases from PARAGRAPH or CODE blocks in the main content area of the PAGE CONTENT.
 - Avoid phrases from navigation menus, headers, footers, or reference sections unless the user explicitly asks about those parts.
 
 CRITICAL FORMATTING: Scroll links MUST use markdown link syntax with square brackets:
-- ✅ CORRECT: [link text](#scroll:exact phrase)
-- ❌ WRONG: "link text (#scroll:exact phrase)"  ← Missing square brackets
-- ❌ WRONG: "#scroll:exact phrase"  ← Missing brackets and link text
-- ❌ WRONG: "link text (#scroll:exact phrase)"  ← Missing square brackets around link text
+- ✅ CORRECT: [actual phrase](#scroll:exact phrase)
+- ❌ WRONG: "link (#scroll:exact phrase)"  ← Uses placeholder "link" instead of actual phrase
+- ❌ WRONG: "linked text (#scroll:exact phrase)"  ← Uses placeholder "linked text" instead of actual phrase
+- ❌ WRONG: "#scroll:exact phrase"  ← Missing brackets and link label
+- ❌ WRONG: "phrase (#scroll:exact phrase)"  ← Missing square brackets around link text
 
 Examples in context:
-- ✅ "React's [useState hook](#scroll:useState hook) manages component state."
-- ✅ "See the [error handling section](#scroll:error handling) for details."
-- ✅ "The [optimistic UI pattern](#scroll:optimistic UI) improves perceived performance."
-- ✅ "Learn about [The useOptimistic() Hook in React 19](#scroll:The useOptimistic() Hook in React 19)."
+- ✅ "React's [useState hook](#scroll:useState hook) manages component state." ← Label is the actual phrase
+- ✅ "See the [error handling section](#scroll:error handling) for details." ← Label is the actual phrase
+- ✅ "The [optimistic UI pattern](#scroll:optimistic UI) improves perceived performance." ← Label is the actual phrase
+- ✅ "Learn about [The useOptimistic() Hook in React 19](#scroll:The useOptimistic() Hook in React 19)." ← Label is the actual phrase
+- ❌ "Component composition: React lets you combine them into reusable, nestable components. [link](#scroll:React lets you combine them into reusable, nestable components)" ← DON'T use "link" as label
 
-CRITICAL: The link text inside square brackets must be clean and match the scroll target exactly. Do NOT:
+CRITICAL: The link text inside square brackets (the LABEL) must be clean and match the scroll target exactly. Do NOT:
 - Duplicate any part of the phrase (e.g., "Hook in React 19 Hook in React 19")
-- Add extra trailing punctuation (e.g., "Hook in React 19)")
+- Add extra trailing punctuation to the LABEL (e.g., "Hook in React 19)" or "phrase.)" or "(UI))" or "(UI)..)")
+- Include trailing punctuation in the #scroll: target phrase - punctuation will be handled automatically
 - Repeat words or phrases within the link text
+
+ABSOLUTE RULE - NO TRAILING PUNCTUATION IN LABELS: The text inside the square brackets (the link label) must NEVER end with trailing punctuation like periods, commas, or extra closing parentheses. 
+- ✅ CORRECT: [React is a JavaScript library for rendering user interfaces (UI)](#scroll:React is a JavaScript library for rendering user interfaces)
+- ❌ WRONG: [React is a JavaScript library for rendering user interfaces (UI).)](#scroll:...) ← Label has trailing ".)"
+- ❌ WRONG: [React is a JavaScript library for rendering user interfaces (UI))](#scroll:...) ← Label has trailing ")"
+- ❌ WRONG: [React is a JavaScript library for rendering user interfaces (UI)..)](#scroll:...) ← Label has trailing "..)"
+- The label text must end at the last word or balanced closing parenthesis, NEVER with trailing punctuation.
+
+IMPORTANT: When creating #scroll: links, do NOT include trailing punctuation (periods, commas, closing parentheses, etc.) in the phrase after #scroll:. 
+- ✅ CORRECT: [React is a JavaScript library](#scroll:React is a JavaScript library for rendering user interfaces)
+- ❌ WRONG: [React is a JavaScript library](#scroll:React is a JavaScript library for rendering user interfaces (UI).)
+- The phrase should end at the last word, not at punctuation marks.
 
 Highlighting rules:
 - When the user asks for "highlights", "specific phrases", or "paragraph snippets", you MUST:
   - Choose a short phrase (3-15 words) from the page text you want the user to read.
+  - Extract ONLY the core phrase, NOT surrounding punctuation or sentence context.
   - Use that exact phrase (word-for-word, character-for-character) as both the label AND the #scroll: target.
+  - CRITICAL - NO SURROUNDING PUNCTUATION: Do NOT include leading periods, trailing periods, or other sentence punctuation in the phrase.
+  - ❌ WRONG: ". React lets you combine them into reusable, nestable components. F" ← Includes leading period and trailing period/letter
+  - ✅ CORRECT: "React lets you combine them into reusable, nestable components" ← Clean phrase
+  - CRITICAL - NO DUPLICATE TEXT: Do NOT include the phrase as plain text before the link. Only include the link itself.
+  - ❌ WRONG: "React is a JavaScript library for rendering user interfaces (UI) [React is a JavaScript library for rendering user interfaces (UI)](#scroll:...)"
+  - ✅ CORRECT: "[React is a JavaScript library for rendering user interfaces (UI)](#scroll:...)"
+  - The link text should stand alone - do not duplicate it as plain text before the link.
 - When choosing phrases for #scroll: links, PREFER text taken from PARAGRAPH or CODE blocks in the main content.
 - Avoid choosing phrases from navigation, header, footer, or reference sections unless the user explicitly asks about those parts.
 - Do NOT use generic section titles (like "Plot", "Cast", "Soundtrack") in #scroll: links when the user has asked for specific phrases or paragraph snippets.
@@ -116,7 +150,8 @@ Horizontal rules:
 - Prefer headings for major breaks, but horizontal rules are acceptable for visual separation.
 
 Page scroll links:
-- When referring back to the page, use links like: [link text](#scroll:target phrase)
+- When referring back to the page, use links like: [actual phrase from page](#scroll:target phrase)
+- CRITICAL: The link label (text inside square brackets) MUST be the actual phrase from the page, NOT placeholder text like "link", "linked text", or "click here". Use the same phrase for both the label and the #scroll: target.
 - The phrase after \`#scroll:\` must be a short phrase (3-15 words) that appears word-for-word, character-for-character, exactly as written in the page's rendered text.
 - ABSOLUTE RULE - NO PARAPHRASING: You MUST NEVER paraphrase, reword, summarize, or modify text when creating scroll links. If you paraphrase content in your response, you CANNOT create a scroll link to that paraphrased text because it doesn't exist on the page. Only create scroll links to phrases that exist EXACTLY as written on the page.
 - MANDATORY: Before creating any #scroll: link, you MUST verify the exact phrase exists in the page text. Search the page text for the exact phrase (case-insensitive). If not found, DO NOT create a scroll link—use plain text instead.
@@ -141,7 +176,7 @@ Examples of INCORRECT formatting (DO NOT use):
 - ❌ "[The useOptimistic() Hook in React 19 Hook in React 19](#scroll:...)"  ← Duplicate text in link label
 - ❌ "[The useOptimistic() Hook in React 19)](#scroll:...)"  ← Extra trailing punctuation
 
-CRITICAL: The link text (inside the square brackets) must be clean and concise. Do NOT duplicate any part of the phrase. The link text should match the scroll target phrase exactly, without repetition or extra punctuation.
+CRITICAL: The link text (inside the square brackets) must be the actual phrase from the page, NOT placeholder text. The link text should typically match the scroll target phrase exactly. Do NOT use generic labels like "link", "linked text", "click here", etc.
 `.trim();
 
 

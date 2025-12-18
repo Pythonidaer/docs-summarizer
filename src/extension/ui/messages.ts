@@ -65,10 +65,13 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
         const bubble = document.createElement("div");
         bubble.setAttribute("data-message-id", msg.id);
         const isLoading = msg.role === "assistant" && msg.loading === true;
+        const hasMetadata = msg.role === "assistant" && !msg.loading && (msg.responseTime !== undefined || msg.tokenUsage);
         Object.assign(bubble.style, {
             maxWidth: "80%",
+            minWidth: hasMetadata ? "400px" : "auto", // Ensure minimum width for footer when metadata exists
+            width: "fit-content", // Let bubble shrink to content, but respect minWidth
             padding: "8px",
-            paddingBottom: msg.role === "assistant" && (msg.responseTime !== undefined || msg.tokenUsage) ? "48px" : "8px", // Extra padding for assistant messages with metadata
+            paddingBottom: hasMetadata ? "48px" : "8px", // Extra padding for assistant messages with metadata
             borderRadius: "6px",
             whiteSpace: "pre-wrap",
             lineHeight: "1.4",
@@ -82,7 +85,9 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
                     ? "1px solid rgba(255,255,255,0.15)"
                     : "1px solid rgba(255,255,255,0.06)",
             fontSize: "13px",
-            position: "relative" // For absolute positioning of metadata
+            position: "relative", // For absolute positioning of metadata footer
+            boxSizing: "border-box", // Include padding in width calculation
+            overflow: hasMetadata ? "visible" : "visible", // Allow dropdown to be visible
         } as CSSStyleDeclaration);
 
         if (msg.role === "assistant") {
@@ -107,19 +112,23 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
 
             // Add metadata footer (response time, tokens, cost) in bottom-right
             // Don't show metadata for loading messages
+            // Position footer relative to bubble to span full bubble width (not drawer width)
             if (!msg.loading && (msg.responseTime !== undefined || msg.tokenUsage)) {
                 const metadataContainer = document.createElement("div");
                 Object.assign(metadataContainer.style, {
                     position: "absolute",
                     bottom: "8px",
-                    right: "8px",
-                    left: "8px", // Extend to left edge for full-width separator
+                    left: "8px", // Start from left edge of bubble (accounting for padding)
+                    right: "8px", // Extend to right edge of bubble (accounting for padding)
+                    width: "calc(100% - 16px)", // Full width of bubble minus padding
+                    maxWidth: "calc(100% - 16px)", // Ensure it doesn't exceed bubble width
+                    minWidth: "0", // Allow container to shrink
                     fontSize: "10px",
                     color: "#f5f5f5",
-                    whiteSpace: "nowrap",
                     paddingTop: "12px",
-                    marginTop: "16px", // More space from content above
                     borderTop: "1px solid rgba(255,255,255,0.15)", // More visible border
+                    boxSizing: "border-box", // Include padding in width calculation
+                    overflow: "visible", // Allow dropdown to be visible outside container
                 } as CSSStyleDeclaration);
 
                 const metadata = document.createElement("span");
@@ -188,15 +197,21 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
                 const metadataRow = document.createElement("div");
                 Object.assign(metadataRow.style, {
                     display: "flex",
-                    alignItems: "center",
+                    alignItems: "center", // Center align vertically so text aligns with button
                     justifyContent: "flex-end",
                     gap: "8px",
+                    flexWrap: "nowrap", // Keep items on one line
+                    minWidth: "0", // Allow flex items to shrink below content size
+                    width: "100%", // Take full width of container
+                    maxWidth: "100%", // Don't exceed container width
+                    position: "relative", // Required for absolute positioning of dropdown
                 } as CSSStyleDeclaration);
 
                 // Join parts with separator, but style voice label differently if present
                 if (msg.voiceId && parts.length > 0) {
                     const voiceLabel = parts[0];
                     const rest = parts.slice(1);
+                    // Use inline style for nested span - no special wrapping needed since parent has nowrap
                     metadata.innerHTML = `<span style="font-weight: 500;">${voiceLabel}</span>${rest.length > 0 ? " • " + rest.join(" • ") : ""}`;
                 } else {
                     metadata.textContent = parts.join(" • ");
@@ -204,7 +219,10 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
                 // Align metadata text to the right
                 Object.assign(metadata.style, {
                     textAlign: "right",
-                    flex: "0 0 auto",
+                    flex: "1 1 0", // Grow and shrink, with 0 basis to allow shrinking
+                    minWidth: "0", // Critical: allow flex item to shrink below its content size
+                    maxWidth: "100%", // Don't exceed container width
+                    whiteSpace: "nowrap", // Keep text on one line
                 } as CSSStyleDeclaration);
                 metadataRow.appendChild(metadata);
 
@@ -283,6 +301,8 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
                         display: "flex",
                         flexDirection: "column",
                         gap: "2px",
+                        visibility: "visible", // Ensure dropdown is visible
+                        opacity: "1", // Ensure dropdown is fully opaque
                     } as CSSStyleDeclaration);
 
                     // Common button styling
@@ -350,6 +370,7 @@ export function renderMessages(main: HTMLElement, msgs: Message[]): void {
 
                 metadataRow.appendChild(exportBtn);
                 metadataContainer.appendChild(metadataRow);
+                // Append metadata to bubble so it spans full bubble width
                 bubble.appendChild(metadataContainer);
             }
         } else {

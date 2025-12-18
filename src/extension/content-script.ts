@@ -19,7 +19,7 @@ import { createMainArea } from "./ui/mainArea";
 import { DRAWER_STYLE_CSS, GLOBAL_HIGHLIGHT_STYLE_CSS, LOADING_ANIMATION_CSS, MODAL_ANIMATION_CSS } from "./ui/styles";
 import { setPageTextForLinks } from "./pageText";
 import { clearAllHighlights, scrollToPageMatch } from "./highlight";
-import { showAlert, showModal, showSecurityFAQ } from "./ui/modal";
+import { showAlert, showModal, showSecurityFAQ, showDonateModal } from "./ui/modal";
 import { deleteApiKey } from "./storage/apiKey";
 import type { PromptVoiceId } from "./prompts/voices";
 import { wireDrawerEvents } from "./ui/events";
@@ -32,6 +32,7 @@ import {
     extractPageStructure,
     serializePageStructureForModel,
 } from "./pageStructure";
+import { normalizeTextForMatching } from "./utils/textNormalization";
 
 // Global UI / prompt state
 let messages: Message[] = [];
@@ -43,6 +44,7 @@ let currentModelSettings: ModelSettings = { ...DEFAULT_MODEL_SETTINGS };
 /**
  * Extracts readable page text from the current document.
  * This stays local to the content script since it depends on `document`.
+ * Uses consistent normalization to ensure matching works correctly.
  */
 export function extractPageTextFromDoc(doc: Document): string {
   const body = doc.body;
@@ -58,7 +60,8 @@ export function extractPageTextFromDoc(doc: Document): string {
     clone.textContent ??
     "";
 
-  return raw.replace(/\s+/g, " ").trim();
+  // Use consistent normalization to ensure matching works
+  return normalizeTextForMatching(raw);
 }
 
 // Track resize listener to avoid duplicates
@@ -263,11 +266,16 @@ function createDrawerUI(): void {
   style.textContent = DRAWER_STYLE_CSS + LOADING_ANIMATION_CSS + MODAL_ANIMATION_CSS;
 
   // Header
-  const { header, closeButton, deleteKeyButton, infoButton } = createHeader();
+  const { header, closeButton, deleteKeyButton, infoButton, donateButton } = createHeader();
   
   // Info button handler
   infoButton.addEventListener("click", () => {
     showSecurityFAQ();
+  });
+  
+  // Donate button handler
+  donateButton.addEventListener("click", () => {
+    showDonateModal();
   });
   
   // Delete Key button handler

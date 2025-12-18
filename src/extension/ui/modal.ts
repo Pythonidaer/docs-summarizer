@@ -340,6 +340,166 @@ export function showPrompt(message: string, placeholder?: string, title?: string
 }
 
 /**
+ * Shows a donation/support modal with Venmo and LinkedIn links
+ */
+export function showDonateModal(): void {
+  // Remove any existing modal
+  removeModal();
+
+  // Create overlay (backdrop)
+  const overlay = document.createElement("div");
+  overlay.id = MODAL_OVERLAY_ID;
+  Object.assign(overlay.style, {
+    position: "fixed",
+    top: "0",
+    left: "0",
+    width: "100%",
+    height: "100%",
+    background: "rgba(0, 0, 0, 0.6)",
+    backdropFilter: "blur(2px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: "1000000",
+    animation: "fadeIn 0.2s ease-out",
+  } as CSSStyleDeclaration);
+
+  // Create modal container
+  const modal = document.createElement("div");
+  modal.className = "docs-summarizer-modal";
+  Object.assign(modal.style, {
+    background: CURSOR_COLORS.backgroundSecondary,
+    borderRadius: CURSOR_BORDERS.radius.md,
+    border: `${CURSOR_BORDERS.width.thin} solid ${CURSOR_COLORS.border}`,
+    padding: CURSOR_SPACING.xl,
+    maxWidth: "400px",
+    width: "90%",
+    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+    fontFamily: CURSOR_TYPOGRAPHY.fontFamily,
+    animation: "slideUp 0.2s ease-out",
+  } as CSSStyleDeclaration);
+
+  // Title with font-weight 700 (bold) to match Security FAQ
+  const titleEl = document.createElement("div");
+  titleEl.className = "docs-summarizer-modal-title";
+  titleEl.textContent = "Support & Connect";
+  titleEl.setAttribute("style", `font-size: ${CURSOR_TYPOGRAPHY.fontSize.lg + 4}px !important; font-weight: 700 !important; color: ${CURSOR_COLORS.textPrimary} !important; margin-bottom: ${CURSOR_SPACING.lg};`);
+  modal.appendChild(titleEl);
+
+  // Content container
+  const content = document.createElement("div");
+  Object.assign(content.style, {
+    fontSize: CURSOR_TYPOGRAPHY.fontSize.base,
+    color: CURSOR_COLORS.textPrimary,
+    lineHeight: CURSOR_TYPOGRAPHY.lineHeight.normal,
+  } as CSSStyleDeclaration);
+
+  // Introduction text
+  const considerText = document.createElement("div");
+  considerText.textContent = "If you found value in this tool, please consider:";
+  Object.assign(considerText.style, {
+    marginBottom: CURSOR_SPACING.lg, // More space between header and text
+  } as CSSStyleDeclaration);
+  content.appendChild(considerText);
+
+  // Combined Venmo and LinkedIn section as single paragraph
+  const donationText = document.createElement("div");
+  donationText.innerHTML = `Thanking me with a Venmo donation: <a href="https://venmo.com/jonamichahammo" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline;">@jonamichahammo</a>, or <a href="https://www.linkedin.com/in/jonamichahammo" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline;">connecting with me on LinkedIn</a>.`;
+  Object.assign(donationText.style, {
+    fontSize: CURSOR_TYPOGRAPHY.fontSize.sm,
+    marginBottom: CURSOR_SPACING.md,
+  } as CSSStyleDeclaration);
+  content.appendChild(donationText);
+
+  // LinkedIn section (for referral note)
+  const linkedInSection = document.createElement("div");
+  Object.assign(linkedInSection.style, {
+    marginBottom: CURSOR_SPACING.md,
+  } as CSSStyleDeclaration);
+
+  const referralNote = document.createElement("div");
+  referralNote.textContent = "You can help me find work by giving me a referral to a position or adding a recommendation to my profile. Jobs I seek include Web Developer, Software Engineer, and Data Analyst.";
+  Object.assign(referralNote.style, {
+    fontSize: CURSOR_TYPOGRAPHY.fontSize.sm,
+    color: CURSOR_COLORS.textPrimary, // White text, not grey
+  } as CSSStyleDeclaration);
+  linkedInSection.appendChild(referralNote);
+
+  content.appendChild(linkedInSection);
+
+  // Closing message
+  const closing = document.createElement("div");
+  closing.textContent = "Your support is greatly appreciated!";
+  Object.assign(closing.style, {
+    marginTop: CURSOR_SPACING.xl, // More space between referral text and closing message
+    fontSize: CURSOR_TYPOGRAPHY.fontSize.sm,
+  } as CSSStyleDeclaration);
+  content.appendChild(closing);
+
+  modal.appendChild(content);
+
+  // Close button (styled to match other modal buttons)
+  const buttonsContainer = document.createElement("div");
+  Object.assign(buttonsContainer.style, {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: CURSOR_SPACING.sm,
+    marginTop: CURSOR_SPACING.lg,
+  } as CSSStyleDeclaration);
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "docs-summarizer-modal-button";
+  closeBtn.textContent = "Close";
+  Object.assign(closeBtn.style, {
+    padding: `${CURSOR_SPACING.xs} ${CURSOR_SPACING.md}`,
+    fontSize: CURSOR_TYPOGRAPHY.fontSize.sm,
+    borderRadius: "9999px", // Pill-shaped
+    border: `${CURSOR_BORDERS.width.thin} solid ${CURSOR_COLORS.border}`,
+    background: "transparent",
+    color: CURSOR_COLORS.textPrimary,
+    cursor: "pointer",
+    transition: "background-color 0.2s, border-color 0.2s",
+    fontFamily: CURSOR_TYPOGRAPHY.fontFamily,
+  } as CSSStyleDeclaration);
+
+  closeBtn.addEventListener("mouseenter", () => {
+    closeBtn.style.background = "rgba(255, 255, 255, 0.05)";
+    closeBtn.style.borderColor = CURSOR_COLORS.inputBorderHover;
+  });
+  closeBtn.addEventListener("mouseleave", () => {
+    closeBtn.style.background = "transparent";
+    closeBtn.style.borderColor = CURSOR_COLORS.border;
+  });
+
+  closeBtn.addEventListener("click", () => {
+    removeModal();
+  });
+
+  buttonsContainer.appendChild(closeBtn);
+  modal.appendChild(buttonsContainer);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  closeBtn.focus();
+
+  // Close on ESC key
+  const handleEsc = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      removeModal();
+      document.removeEventListener("keydown", handleEsc);
+    }
+  };
+  document.addEventListener("keydown", handleEsc);
+
+  // Close on overlay click
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) {
+      removeModal();
+    }
+  });
+}
+
+/**
  * Shows a Security & Privacy FAQ modal with scrollable content
  */
 export function showSecurityFAQ(): void {

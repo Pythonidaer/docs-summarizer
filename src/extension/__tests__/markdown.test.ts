@@ -58,6 +58,55 @@ describe("renderInlineMarkdown", () => {
     expect(link!.textContent).toBe("section");
   });
 
+  test("strips trailing punctuation from scroll link labels deterministically", () => {
+    setPageTextForLinks("React is a JavaScript library for rendering user interfaces (UI). UI is built from small units.");
+
+    // Test case: AI generates link with trailing punctuation in label
+    // Note: The href will be truncated by regex at first ), but label should still be cleaned
+    const input = "[React is a JavaScript library for rendering user interfaces (UI).)](#scroll:React is a JavaScript library for rendering user interfaces)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    // Label should have the extra closing paren stripped but keep the period
+    // Page text is "(UI)." so link should match: "(UI)." not "(UI).)" or "(UI)"
+    expect(link!.textContent).toBe("React is a JavaScript library for rendering user interfaces (UI).");
+    expect(link!.textContent).not.toContain(".)");
+    expect(link!.textContent).not.toContain("..)");
+  });
+
+  test("strips excess trailing closing parens from labels (e.g., (UI))", () => {
+    setPageTextForLinks("React is a JavaScript library for rendering user interfaces (UI).");
+
+    // Test case: AI generates link with excess closing paren: "(UI))" -> should become "(UI)"
+    const input = "[React is a JavaScript library for rendering user interfaces (UI))](#scroll:React is a JavaScript library for rendering user interfaces)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    // Label should have excess closing paren stripped: "(UI))" -> "(UI)"
+    expect(link!.textContent).toBe("React is a JavaScript library for rendering user interfaces (UI)");
+    expect(link!.textContent).not.toContain("))");
+    expect(link!.textContent).toContain("(UI)");
+  });
+
+  test("strips multiple trailing punctuation marks from labels (e.g., UI)..))", () => {
+    setPageTextForLinks("React is a JavaScript library for rendering user interfaces (UI).");
+
+    // Test case with multiple trailing punctuation marks in label
+    // Note: The href will be truncated by regex, but label should still be cleaned
+    const input = "[React is a JavaScript library for rendering user interfaces (UI)..)](#scroll:React is a JavaScript library for rendering user interfaces)";
+    renderMarkdownInto(container, input);
+
+    const link = container.querySelector("a");
+    expect(link).not.toBeNull();
+    // Label should have the extra closing paren and extra period stripped
+    // Page text is "(UI)." so link should match: "(UI)." not "(UI)..)" or "(UI)"
+    expect(link!.textContent).toBe("React is a JavaScript library for rendering user interfaces (UI).");
+    expect(link!.textContent).not.toContain(".)");
+    expect(link!.textContent).not.toContain("..)");
+  });
+
   test("handles trailing punctuation variations in phrase matching", () => {
     setPageTextForLinks("The Night of the Long Knives was a significant event.");
 

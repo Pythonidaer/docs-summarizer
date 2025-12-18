@@ -63,8 +63,8 @@ describe("PROMPT_VOICES data integrity", () => {
     const uniqueIds = new Set(ids);
     // Check that all IDs are unique
     expect(ids.length).toBe(uniqueIds.size);
-    // Verify we have the expected number of voices (13)
-    expect(PROMPT_VOICES.length).toBe(13);
+    // Verify we have the expected number of voices (14)
+    expect(PROMPT_VOICES.length).toBe(14);
   });
 
   test("all voice IDs are valid PromptVoiceId types", () => {
@@ -77,6 +77,7 @@ describe("PROMPT_VOICES data integrity", () => {
       "socratic",
       "in_depth",
       "mla_essay",
+      "apa_essay",
       "technical_report",
       "research_abstract",
       "retrieval_coach",
